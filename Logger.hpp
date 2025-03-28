@@ -13,6 +13,7 @@ private:
     // std::thread m_thread; // TODO: use a threadpool instead of a single thread
     std::unique_ptr<ThreadPool> m_threads;
     std::ofstream m_file;
+    std::mutex m_mutex;
 
 public:
     Logger(const std::string& filename)
@@ -39,11 +40,14 @@ public:
             process();
         });
     }
+    //
 
 
 private:
     void process(){
         std::string msg;
+        // TODO: 读写锁优化
+        std::lock_guard<std::mutex> lock(m_mutex);
         while(m_queue.pop(msg)){
             m_file << msg << std::endl;
             // m_file.flush();
