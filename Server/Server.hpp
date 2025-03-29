@@ -12,6 +12,8 @@
 #include <sys/wait.h>
 #include <cstring>
 #include <thread>
+#include <chrono>
+#include <ctime>
 #include "../Logger.hpp"
 
 // 客户端从本地文件读取日志信息后传到远端服务器
@@ -21,6 +23,22 @@ namespace Server{
     
     void socketIO(int socket){
         char buffer[1024] = {0}; // 初始化缓冲区
+        
+        // 获取客户端信息
+        struct sockaddr_in client_addr;
+        socklen_t addr_len = sizeof(client_addr);
+        getpeername(socket, (struct sockaddr*)&client_addr, &addr_len);
+        std::string client_ip = inet_ntoa(client_addr.sin_addr);
+        int client_port = ntohs(client_addr.sin_port);
+        
+        // 记录连接信息
+        std::cout << "\033[1;34m[连接建立]\033[0m 客户端 " << client_ip << ":" << client_port << " 已连接" << std::endl;
+        
+        // 消息统计
+        uint64_t total_bytes = 0;
+        uint64_t message_count = 0;
+        time_t start_time = time(nullptr);
+        
         for (;;)
         {
             memset(buffer, 0, sizeof(buffer)); // 每次读取前清空缓冲区
@@ -28,21 +46,58 @@ namespace Server{
             int valread = read(socket, buffer, sizeof(buffer));
             if (valread == 0)
             {
-                std::cout << "Client disconnected" << std::endl;
+                std::cout << "\033[1;33m[连接终止]\033[0m 客户端 " << client_ip << ":" << client_port << " 断开连接" << std::endl;
+                // 显示会话统计信息
+                time_t session_duration = time(nullptr) - start_time;
+                std::cout << "\033[1;36m[会话统计]\033[0m 总接收: " 
+                          << total_bytes << " 字节, 消息数: " << message_count 
+                          << ", 持续时间: " << session_duration << " 秒" << std::endl;
                 break;
             }
             else if (valread == -1)
             {
-                std::cerr << "Read error. errno: " << errno << std::endl;
+                std::cerr << "\033[1;31m[错误]\033[0m 读取失败. 错误码: " << errno << " (" << strerror(errno) << ")" << std::endl;
                 break;
             }
 
-            std::cout << "Client # " << buffer << std::endl;
-
-            std::string message = std::string(buffer) + " server[received]";
-            write(socket, message.c_str(), message.size());
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            // 更新统计信息
+            total_bytes += valread;
+            message_count++;
+            
+            // 格式化当前时间
+            auto now = std::chrono::system_clock::now();
+            std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+            char time_buffer[64];
+            std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&now_time));
+            
+            // 打印收到的消息摘要
+            std::string message_preview;
+            if (valread > 50) {
+                message_preview = std::string(buffer).substr(0, 47) + "...";
+            } else {
+                message_preview = std::string(buffer);
+            }
+            
+            std::cout << "\033[1;32m[消息接收]\033[0m [" << time_buffer << "] " 
+                      << client_ip << ":" << client_port << " > " << message_preview 
+                      << " (" << valread << " 字节)" << std::endl;
+            
+            // 创建更结构化的响应消息
+            std::string response = "{\n";
+            response += "  \"status\": \"success\",\n";
+            response += "  \"timestamp\": \"" + std::string(time_buffer) + "\",\n";
+            response += "  \"message_size\": " + std::to_string(valread) + ",\n";
+            response += "  \"server_id\": \"log_server_01\",\n";
+            response += "  \"client\": \"" + client_ip + ":" + std::to_string(client_port) + "\",\n";
+            response += "  \"message_number\": " + std::to_string(message_count) + ",\n";
+            response += "  \"total_bytes\": " + std::to_string(total_bytes) + "\n";
+            response += "}";
+            
+            // 发送响应
+            int bytes_sent = write(socket, response.c_str(), response.size());
+            std::cout << "\033[1;36m[响应发送]\033[0m 响应大小: " << bytes_sent << " 字节" << std::endl;
         }
+        
         close(socket); // 关闭套接字
     }
 
