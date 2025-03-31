@@ -1,8 +1,2 @@
-cmake_minimum_required(VERSION 3.10)
-
-project(AsynchronousLoggingSystem)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
-
-add_executable(client Client.cpp Client.hpp)
+add_library(Client_Lib Client.cpp)
+target_include_directories(Client_Lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Client)

@@ -12,5 +12,12 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Add the executable
-add_executable(test main.cpp)
+add_subdirectory(Client)
+add_subdirectory(Server)
+
+add_executable(server Server/Server.cpp)
+add_executable(client Client/Client.cpp)
+add_executable(main main.cpp)
+
+target_link_libraries(server Server_Lib)
+target_link_libraries(client Client_Lib)

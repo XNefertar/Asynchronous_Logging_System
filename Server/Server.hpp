@@ -15,6 +15,7 @@
 #include <chrono>
 #include <ctime>
 #include "../Logger.hpp"
+#include "../LogMessage.hpp"
 
 // 客户端从本地文件读取日志信息后传到远端服务器
 // 服务器接收日志信息并返回确认信息给客户端
@@ -94,6 +95,8 @@ namespace Server{
             response += "}";
             
             // 发送响应
+            LogMessage::setDefaultLogPath("/home/xl/repositories/Asynchronous_Logging_System/Server/serverLog.txt");
+            LogMessage::logMessage(INFO, "接收客户端消息: %s", buffer);
             int bytes_sent = write(socket, response.c_str(), response.size());
             std::cout << "\033[1;36m[响应发送]\033[0m 响应大小: " << bytes_sent << " 字节" << std::endl;
         }
