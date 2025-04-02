@@ -16,10 +16,10 @@ int main(){
         static int index = 0;
         logger.log("[%s], The %dth log message", time_buffer, index++);
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        if(index >= 100000){
-            std::ofstream ofs("log.txt", std::ofstream::out | std::ofstream::trunc);
-            ofs.close();
-        }
+        // if(index >= 100000){
+        //     std::ofstream ofs("log.txt", std::ofstream::out | std::ofstream::trunc);
+        //     ofs.close();
+        // }
     }
     std::this_thread::sleep_for(std::chrono::seconds(1));
     return 0;
