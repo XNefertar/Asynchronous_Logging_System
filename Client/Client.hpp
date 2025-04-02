@@ -12,7 +12,8 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
-#include "../LogMessage.hpp"
+#include <filesystem>
+#include "../LogMessage/LogMessage.hpp"
 
 
 class ClientTCP
@@ -113,7 +114,8 @@ public:
                     // 解析并显示JSON响应
                     std::cout << "服务器响应: " << std::endl;
 
-                    LogMessage::setDefaultLogPath("/home/xl/repositories/Asynchronous_Logging_System/Client/clientLog.txt");
+                    std::string path = std::filesystem::current_path().string() + "/Log/Client.txt";
+                    LogMessage::setDefaultLogPath(path);
                     LogMessage::logMessage(INFO, "接收服务器响应: %s", buffer);
                     
                     // 简单解析JSON (不使用外部库)

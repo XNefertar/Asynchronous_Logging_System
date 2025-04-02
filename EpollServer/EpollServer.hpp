@@ -8,8 +8,12 @@
 #include <cstdint>
 #include <chrono>
 #include <fstream>
+#include <queue>
 #include <map>
+#include <filesystem>
 #include "../Util/Sock.hpp"
+#include "../MySQL/SqlConnPool.hpp"
+
 
 namespace EpollServerSpace{
 
@@ -31,17 +35,32 @@ namespace EpollServerSpace{
     
     class EpollServer{
     private:
-        uint64_t _port;
-        struct epoll_event* _events;
-        int _epollfd;
-        int _listenfd;
-        std::ofstream _log_file;
-        std::map<int, ClientSession> _sessions; // 存储客户端会话信息
-    
+        uint64_t                        _port;
+        std::string                     _defaultUserName;
+        std::string                     _defaultPassword;
+        std::string                     _defaultDBName;
+
+        int                             _listenfd;
+        int                             _epollfd;
+        std::ofstream                   _log_file;
+        struct epoll_event*             _events;
+        std::map<int, ClientSession>    _sessions; // 存储客户端会话信息
+        std::string                     _defaultIPAddress;
+        int                             _defaultPort;
+        int                             _defaultMaxConn;
+
+
     public:
         // TODO
         // 路径硬编码问题
-        EpollServer(uint64_t port, std::string path = "/home/xl/repositories/Asynchronous_Logging_System/EpollServer/log.txt");
+        EpollServer( uint64_t port
+                   , std::string defaultUserName
+                   , std::string defaultPassword
+                   , std::string defaultDBName
+                   , std::string path = std::filesystem::current_path().string() + "/Log/Epoll_Server.txt"
+                   , std::string defaultIPAddress = "localhost"
+                   , int defaultPort = 3306
+                   , int defaultMaxConn = 10);
     
         ~EpollServer();
     

@@ -8,18 +8,34 @@ void EpollServerSpace::signalHandler(int signum)
     exit(0);
 }
 
-EpollServer::EpollServer(uint64_t port, std::string path)
-    :_port(port)
-    ,_listenfd(defaultValue)
-    ,_epollfd(defaultValue)
-    ,_log_file(path)
-    ,_events(nullptr)
-    ,_sessions()
+EpollServer::EpollServer( uint64_t port
+                        , std::string defaultUserName
+                        , std::string defaultPassword
+                        , std::string defaultDBName
+                        , std::string path
+                        , std::string defaultIPAddress
+                        , int defaultPort
+                        , int defaultMaxConn)
+    : _port(port)
+    , _defaultUserName(defaultUserName)
+    , _defaultPassword(defaultPassword)
+    , _defaultDBName(defaultDBName)
+
+    , _listenfd(defaultValue)
+    , _epollfd(defaultValue)
+    , _log_file(path)
+    , _events(nullptr)
+    , _sessions()
+    , _defaultIPAddress(defaultIPAddress)
+    , _defaultPort(defaultPort)
+    , _defaultMaxConn(defaultMaxConn)
 {
     if (port == 0)
         _port = defaultPort;
 
     _events = new struct epoll_event[defaultEpollSize];
+    SqlConnPool::getInstance()->init(_defaultIPAddress.c_str(), _defaultUserName.c_str(), _defaultPassword.c_str(), _defaultDBName.c_str(), _defaultPort, _defaultMaxConn);
+
 }
 
 EpollServer::~EpollServer()
@@ -160,6 +176,17 @@ void EpollServer::HandleEvents(int ReadyNum){
                           << message_preview << " (" << n << " 字节)" << std::endl;
                 _log_file.flush();
                 std::cout << "\033[1;36m[日志记录]\033[0m 日志已更新" << std::endl;
+                
+                // 记录日志到数据库
+                std::string message_test = "Hello World!";
+                std::string sql = "INSERT INTO log_table (ip, port, message, timestamp) VALUES ('" + _sessions[sockfd].ip + "', " +
+                              std::to_string(_sessions[sockfd].port) + ", '" + message_test + "', NOW());";
+                MYSQL* conn = nullptr;
+                SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
+                if(conn){
+                    mysql_query(conn, sql.c_str());
+                    LogMessage::logMessage(INFO, "MySQL 插入日志: %s", sql.c_str());
+                }
                 
                 // 创建结构化的JSON响应
                 std::string response = "{\n";

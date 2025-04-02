@@ -7,7 +7,8 @@
 #include <mutex>
 #include <queue>
 #include <semaphore.h>
-#include "../LogMessage.hpp"
+#include <filesystem>
+#include "../LogMessage/LogMessage.hpp"
 // #include <condition_variable>
 
 // 单例模式下的数据库连接池
@@ -27,13 +28,14 @@ public:
     MYSQL* getConnection();
     void releaseConnection(MYSQL* conn);
     void destroyPool();
+    void createDatabase(std::string dbName);
     void init(const char* host, const char* user, const char* password, const char* dbName, int port, int maxConn);
     int getReleaseConnCount();
 
-    ~SqlConnPool();
 
 private:
-    SqlConnPool();
+    SqlConnPool() = default;
+    ~SqlConnPool() { destroyPool(); }
     SqlConnPool(const SqlConnPool&) = delete;
     SqlConnPool& operator=(const SqlConnPool&) = delete;
 
@@ -45,26 +47,22 @@ private:
 #define __SQLCONNPOOLRAII_CPP__
 
 class SqlConnRAII {
-private:
-    MYSQL* _conn;
-    SqlConnPool* _connPool;
 public:
-    SqlConnRAII(MYSQL** conn, SqlConnPool* connPool)
-    {
-        assert(_conn);
-        *conn = _connPool->getConnection();
-        _connPool = connPool;
+    SqlConnRAII(MYSQL** conn, SqlConnPool* connPool) : _connPool(connPool), _conn(nullptr) {
+        assert(connPool);  // 添加断言确保连接池不为空
+        *conn = connPool->getConnection();
         _conn = *conn;
     }
-
+    
     ~SqlConnRAII() {
-        if (_conn) {
+        if (_conn && _connPool) {  // 检查两个指针都不为空
             _connPool->releaseConnection(_conn);
         }
     }
-
+    
+private:
+    SqlConnPool* _connPool;
+    MYSQL* _conn;
 };
-
-
 
 #endif // __SQLCONNPOOLRAII_CPP__
