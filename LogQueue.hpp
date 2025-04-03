@@ -63,4 +63,4 @@ public:
     }
 };
 
-#endif // __LOGQUEUE_HPP__d
+#endif // __LOGQUEUE_HPP__
