@@ -11,6 +11,9 @@
 #include <queue>
 #include <map>
 #include <filesystem>
+// C++17 std::locale
+#include <locale>
+#include <algorithm>
 #include "../Util/Sock.hpp"
 #include "../MySQL/SqlConnPool.hpp"
 

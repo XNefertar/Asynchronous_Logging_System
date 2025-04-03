@@ -181,9 +181,33 @@ void EpollServer::HandleEvents(int ReadyNum){
                 std::cout << "\033[1;36m[日志记录]\033[0m 日志已更新" << std::endl;
                 
                 // 记录日志到数据库
+                // 解析出日志等级字段
+                // 该内容存储在messafe_preview字段中
+                auto pos1 = message_preview.find('[');
+                if(pos1 == std::string::npos){
+                    std::cerr << "\033[1;31m[错误]\033[0m 日志等级解析失败" << std::endl;
+                    continue;
+                }
+                auto pos2 = message_preview.find(']', pos1);
+                if(pos2 == std::string::npos){
+                    std::cerr << "\033[1;31m[错误]\033[0m 日志等级解析失败" << std::endl;
+                    continue;
+                }
+                std::string logLevel = message_preview.substr(pos1, pos2 - pos1 + 1);
+                // 去掉中括号
+                logLevel = logLevel.substr(1, logLevel.length() - 2);
+                // 使用std::locale C++17将字符串转换为大写
+                // std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(), ::toupper);
+                std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(),
+                                [](unsigned char c) { return std::toupper(c); });
+                // TODO: message字段需要更新
+                // TODO: 增加预处理语句, 防止SQL注入等安全问题
                 std::string message_test = "Hello World!";
-                std::string sql = "INSERT INTO log_table (ip, port, message, timestamp) VALUES ('" + _sessions[sockfd].ip + "', " +
-                              std::to_string(_sessions[sockfd].port) + ", '" + message_test + "', NOW());";
+                std::string sql = "INSERT INTO log_table (level, ip, port, message) VALUES ('" + 
+                                  logLevel + "', '" + 
+                                  _sessions[sockfd].ip + "', " + 
+                                  std::to_string(_sessions[sockfd].port) + ", '" + 
+                                  message_test + "');";
                 MYSQL* conn = nullptr;
                 SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
                 if(conn){

@@ -63,8 +63,18 @@ bool SqlConnPool::init(const char *host, const char *user, const char *password,
     LogMessage::logMessage(INFO, "Database %s selected successfully", dbName);
 
     // 3. 创建表结构
-    // TODO: 加入日志等级
-    sql = "CREATE TABLE IF NOT EXISTS log_table (id BIGINT AUTO_INCREMENT PRIMARY KEY, ip VARCHAR(32) NOT NULL, port INT NOT NULL, message TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);";
+    sql = R"(
+        CREATE TABLE IF NOT EXISTS log_table (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, 
+        level ENUM('TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'FATAL') NOT NULL, 
+        ip VARCHAR(45) NOT NULL,  -- 支持完整的IPv6地址
+        port SMALLINT UNSIGNED NOT NULL, 
+        message TEXT, 
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_timestamp (timestamp),
+        INDEX idx_level (level)
+        ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT='系统日志表';
+    )";
     if (mysql_query(temp, sql.c_str()) != 0) {
         LogMessage::logMessage(ERROR, "Failed to create table: %s", mysql_error(temp));
         mysql_close(temp);
