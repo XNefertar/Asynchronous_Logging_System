@@ -29,7 +29,7 @@ public:
     void releaseConnection(MYSQL* conn);
     void destroyPool();
     void createDatabase(std::string dbName);
-    void init(const char* host, const char* user, const char* password, const char* dbName, int port, int maxConn);
+    bool init(const char* host, const char* user, const char* password, const char* dbName, int port, int maxConn);
     int getReleaseConnCount();
 
 

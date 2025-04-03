@@ -27,7 +27,7 @@ void SqlConnPool::createDatabase(std::string dbName)
     }
 }
 
-void SqlConnPool::init(const char *host, const char *user, const char *password, const char *dbName, int port, int connSize) {
+bool SqlConnPool::init(const char *host, const char *user, const char *password, const char *dbName, int port, int connSize) {
     std::string path = std::filesystem::current_path().string() + "/Log/SqlConnPool.txt";
     LogMessage::setDefaultLogPath(path);
 
@@ -35,14 +35,14 @@ void SqlConnPool::init(const char *host, const char *user, const char *password,
     MYSQL* temp = mysql_init(nullptr);
     if (!temp) {
         LogMessage::logMessage(ERROR, "Failed to initialize MySQL connection");
-        return;
+        return false;
     }
 
     // 连接到服务器，不指定数据库
     if (!mysql_real_connect(temp, host, user, password, nullptr, port, nullptr, 0)) {
         LogMessage::logMessage(ERROR, "Failed to connect to MySQL server: %s", mysql_error(temp));
         mysql_close(temp);
-        return;
+        return false;
     }
 
     // 2. 创建数据库
@@ -51,23 +51,24 @@ void SqlConnPool::init(const char *host, const char *user, const char *password,
     if (mysql_query(temp, sql.c_str()) != 0) {
         LogMessage::logMessage(ERROR, "Failed to create database: %s", mysql_error(temp));
         mysql_close(temp);
-        return;
+        return false;
     }
 
     // 选择刚创建的数据库
     if (mysql_select_db(temp, dbName) != 0) {
         LogMessage::logMessage(ERROR, "Failed to select database: %s", mysql_error(temp));
         mysql_close(temp);
-        return;
+        return false;
     }
     LogMessage::logMessage(INFO, "Database %s selected successfully", dbName);
 
     // 3. 创建表结构
+    // TODO: 加入日志等级
     sql = "CREATE TABLE IF NOT EXISTS log_table (id BIGINT AUTO_INCREMENT PRIMARY KEY, ip VARCHAR(32) NOT NULL, port INT NOT NULL, message TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);";
     if (mysql_query(temp, sql.c_str()) != 0) {
         LogMessage::logMessage(ERROR, "Failed to create table: %s", mysql_error(temp));
         mysql_close(temp);
-        return;
+        return false;
     }
     LogMessage::logMessage(INFO, "Database and table created successfully");
 
@@ -92,6 +93,8 @@ void SqlConnPool::init(const char *host, const char *user, const char *password,
 
     _maxConn = _connQueue.size();
     sem_init(&_semID, 0, _maxConn);
+
+    return true;
 }
 
 MYSQL* SqlConnPool::getConnection(){

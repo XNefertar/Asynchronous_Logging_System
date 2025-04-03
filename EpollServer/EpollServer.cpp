@@ -34,7 +34,10 @@ EpollServer::EpollServer( uint64_t port
         _port = defaultPort;
 
     _events = new struct epoll_event[defaultEpollSize];
-    SqlConnPool::getInstance()->init(_defaultIPAddress.c_str(), _defaultUserName.c_str(), _defaultPassword.c_str(), _defaultDBName.c_str(), _defaultPort, _defaultMaxConn);
+    if(!SqlConnPool::getInstance()->init(_defaultIPAddress.c_str(), _defaultUserName.c_str(), _defaultPassword.c_str(), _defaultDBName.c_str(), _defaultPort, _defaultMaxConn)){
+        std::cerr << "\033[1;31m[错误]\033[0m 数据库连接池初始化失败" << std::endl;
+        exit(1);
+    }
 
 }
 
