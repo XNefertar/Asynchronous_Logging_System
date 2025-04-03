@@ -124,14 +124,66 @@ public:
     }
 
     template <typename ...Args>
-    void log(INFO_LEVEL level, const std::string& format, Args ...args){
-        m_queue.push(process_string(level, format, args...));
+    void log_in_text(INFO_LEVEL level, const std::string& format, Args ...args){
+        m_queue.push(process_text(level, format, args...));
         m_threads->submitTask([this](){
             process();
         });
     }
 
+    template<typename ...Args>
+    void log_in_html(INFO_LEVEL level, const std::string& format, Args ...args){
+        m_queue.push(process_html(level, format, args...));
+        m_threads->submitTask([this](){
+            process();
+        });
+    }
+
+    void init_for_html(){
+        m_file << R"(<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时日志</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            padding: 20px;
+        }
+        .log { margin: 5px 0; }
+        .info { color: #8888ff; }
+        .warning { color: #ffaa00; }
+        .error { color: #ff4444; }
+        .debug { color: #00ff00; }
+        .fatal { color: #ff00ff; }
+    </style>
+    <script>
+        function refreshPage() {
+            window.location.reload();
+        }
+        setInterval(refreshPage, 3000); // 每3秒刷新一次
+    </script>
+</head>
+<body>
+    <h2>实时日志</h2>
+)";
+    }
+
 private:
+    std::string getLevelClass(INFO_LEVEL level) const {
+        switch (level) {
+            case INFO: return "info";
+            case DEBUG: return "debug";
+            case WARNING: return "warning";
+            case ERROR: return "error";
+            case FATAL: return "fatal";
+            default: return "info";
+        }
+    }
+
     std::string getLevelString(INFO_LEVEL level) const {
         switch (level) {
             case INFO: return "INFO";
@@ -152,7 +204,7 @@ private:
     }
 
     template <typename ...Args>
-    std::string process_string(INFO_LEVEL level, const std::string& format, Args ...args){
+    std::string process_text(INFO_LEVEL level, const std::string& format, Args ...args){
         std::vector<std::string> args_str = {to_string(args)...};
         std::ostringstream os;
         os.clear();
@@ -176,6 +228,50 @@ private:
         while(args_index < args_str.size()){
             os << args_str[args_index++];
         }
+
+        return os.str();
+    }
+
+    template<typename ...Args>
+    std::string process_html(INFO_LEVEL level, const std::string& format, Args ...args){
+        std::vector<std::string> args_str = {to_string(args)...};
+        std::ostringstream os;
+        os.clear();
+
+        // 获取日志级别字符串和对应的CSS类名
+        std::string levelStr = getLevelString(level);
+        std::string levelClass = getLevelClass(level);
+        
+        // 获取当前时间
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        char time_buffer[100];
+        std::strftime(time_buffer, sizeof(time_buffer), "%a %b %d %H:%M:%S %Y", std::localtime(&now_time));
+        
+        // 创建与样例log.html相同格式的HTML
+        os << "<div class='log " << levelClass << "'>[" << levelStr << "] " << time_buffer << " - ";
+
+        // 处理消息内容
+        int args_index = 0, last_position = 0;
+        int placeholder_index = format.find("{}");
+        while(placeholder_index != std::string::npos){
+            if(args_index >= args_str.size()){
+                break;
+            }
+            os << format.substr(last_position, placeholder_index - last_position);
+            os << args_str[args_index++];
+            last_position = placeholder_index + 2;
+            placeholder_index = format.find("{}", last_position);
+        }
+
+        if(!format.empty() && args_index >= args_str.size()){
+            os << format.substr(last_position);
+        }
+        while(args_index < args_str.size()){
+            os << args_str[args_index++];
+        }
+
+        os << "</div>";
 
         return os.str();
     }

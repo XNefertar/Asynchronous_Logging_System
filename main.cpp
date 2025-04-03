@@ -44,34 +44,89 @@ void TEST_FUNC(BITMAP bitmap){
 int main(){
     // TODO: 提供多种日志选项
     // 用户可以选择普通文件(.txt)或html文件(.html)
-    Logger logger("log.txt");
+    int option = 0;
+    std::cout << "请选择日志选项: " << std::endl;
+    std::cout << "0. 普通文件(.txt)" << std::endl;
+    std::cout << "1. HTML文件(.html)" << std::endl;
+    std::cin >> option;
+
+    std::ofstream file("/tmp/option.tmp");
+    if (file) {
+        file << option;
+        // 记得要 flush 刷新缓冲区
+        // 这样才能确保数据写入文件
+        file.flush();
+        std::rename("/tmp/option.tmp", "/tmp/option.flag"); // 原子操作
+        std::cout << "选项已保存到 /tmp/option.flag" << std::endl;
+        std::cout << "option = " << option << std::endl;
+    }
+    if(option < 0 || option > 1){
+        std::cerr << "无效的选项, 请选择0或1。" << std::endl;
+        return -1;
+    } 
+    switch(option){
+        case 0:
+        {
+            Logger logger("log.txt");
+            while(true){
+                auto now = std::chrono::system_clock::now();
+                std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+                char time_buffer[100];
+                std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&now_time));
+                time_buffer[sizeof(time_buffer) - 1] = '\0'; // Ensure null-termination
+                static int index = 0;
+                try{
+                    TEST_FUNC(getRandomBitmap());
+                }catch(const std::out_of_range& e){
+                    logger.log_in_text(WARNING, "Out of range exception: " + std::string(e.what()) + " at " + time_buffer);
+                }catch(const std::length_error& e){
+                    logger.log_in_text(ERROR, "Length error exception: " + std::string(e.what()) + " at " + time_buffer);
+                }catch(const std::invalid_argument& e){
+                    logger.log_in_text(ERROR, "Invalid argument exception: " + std::string(e.what()) + " at " + time_buffer);
+                }catch(const std::runtime_error& e){
+                    logger.log_in_text(INFO, "Runtime error exception: " + std::string(e.what()) + " at " + time_buffer);
+                }catch(...){
+                    logger.log_in_text(WARNING, "Unknown exception: " + std::string("Unknown exception") + " at " + time_buffer);
+                }
+                
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+                
+            }
+        }
+        case 1:
+        {
+            Logger logger("log.html");
+            logger.init_for_html();
+            while(true){
+                auto now = std::chrono::system_clock::now();
+                std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+                char time_buffer[100];
+                std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&now_time));
+                time_buffer[sizeof(time_buffer) - 1] = '\0'; // Ensure null-termination
+                static int index = 0;
+                try{
+                    TEST_FUNC(getRandomBitmap());
+                }catch(const std::out_of_range& e){
+                    logger.log_in_html(WARNING, "Out of range exception: " + std::string(e.what()) + " at " + time_buffer);
+                }catch(const std::length_error& e){
+                    logger.log_in_html(ERROR, "Length error exception: " + std::string(e.what()) + " at " + time_buffer);
+                }catch(const std::invalid_argument& e){
+                    logger.log_in_html(ERROR, "Invalid argument exception: " + std::string(e.what()) + " at " + time_buffer);
+                }catch(const std::runtime_error& e){
+                    logger.log_in_html(INFO, "Runtime error exception: " + std::string(e.what()) + " at " + time_buffer);
+                }catch(...){
+                    logger.log_in_html(WARNING, "Unknown exception: " + std::string("Unknown exception") + " at " + time_buffer);
+                }
+                
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+        }
+
+    }
     // Hello C++ World
     // Hello C++ World {} {}
-    // Hello C++ WorldHello World   
-    while(true){
-        auto now = std::chrono::system_clock::now();
-        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-        char time_buffer[100];
-        std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&now_time));
-        time_buffer[sizeof(time_buffer) - 1] = '\0'; // Ensure null-termination
-        static int index = 0;
-        try{
-            TEST_FUNC(getRandomBitmap());
-        }catch(const std::out_of_range& e){
-            logger.log(WARNING, "Out of range exception: " + std::string(e.what()) + " at " + time_buffer);
-        }catch(const std::length_error& e){
-            logger.log(ERROR, "Length error exception: " + std::string(e.what()) + " at " + time_buffer);
-        }catch(const std::invalid_argument& e){
-            logger.log(ERROR, "Invalid argument exception: " + std::string(e.what()) + " at " + time_buffer);
-        }catch(const std::runtime_error& e){
-            logger.log(INFO, "Runtime error exception: " + std::string(e.what()) + " at " + time_buffer);
-        }catch(...){
-            logger.log(WARNING, "Unknown exception: " + std::string("Unknown exception") + " at " + time_buffer);
-        }
-        
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        
-    }
+    // Hello C++ WorldHello World
+    
     std::this_thread::sleep_for(std::chrono::seconds(1));
     return 0;
 }
