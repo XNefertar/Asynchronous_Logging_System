@@ -42,7 +42,7 @@ EpollServer::EpollServer( uint64_t port
 }
 
 int EpollServer::LeveltoInt(const std::string& level) {
-    if (level == "NORMAL") return ;
+    if (level == "NORMAL") return NORMAL;
     if (level == "DEBUG") return DEBUG;
     if (level == "INFO") return INFO;
     if (level == "WARNING") return WARNING;
@@ -247,17 +247,71 @@ void EpollServer::HandleEvents(int ReadyNum){
                     std::cout << "\033[1;32m[数据库记录]\033[0m 日志记录到数据库" << std::endl;
                     // TODO: message字段需要更新
                     // TODO: 增加预处理语句, 防止SQL注入等安全问题
-                    std::string message_test = "Hello World!";
-                    std::string sql = "INSERT INTO log_table (level, ip, port, message) VALUES ('" + 
-                                      logLevel + "', '" + 
-                                      _sessions[sockfd].ip + "', " + 
-                                      std::to_string(_sessions[sockfd].port) + ", '" + 
-                                      message_test + "');";
+
+                    // 使用message_preview作为消息内容
+                    std::string message_content = message_preview;
+                    
                     MYSQL* conn = nullptr;
                     SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
                     if(conn){
-                        mysql_query(conn, sql.c_str());
-                        LogMessage::logMessage(INFO, "MySQL 插入日志: %s", sql.c_str());
+                        // 1. 初始化预处理语句
+                        MYSQL_STMT *stmt = mysql_stmt_init(conn);
+                        if (!stmt) {
+                            LogMessage::logMessage(ERROR, "mysql_stmt_init() 失败: %s", mysql_error(conn));
+                            continue;
+                        }
+                        
+                        // 2. 准备带有占位符的SQL语句
+                        const char *query = "INSERT INTO log_table (level, ip, port, message) VALUES (?, ?, ?, ?)";
+                        if (mysql_stmt_prepare(stmt, query, strlen(query))) {
+                            LogMessage::logMessage(ERROR, "mysql_stmt_prepare() 失败: %s", mysql_stmt_error(stmt));
+                            mysql_stmt_close(stmt);
+                            continue;
+                        }
+                        
+                        // 3. 绑定参数
+                        MYSQL_BIND bind[4];
+                        memset(bind, 0, sizeof(bind));
+                        
+                        // level 参数
+                        bind[0].buffer_type = MYSQL_TYPE_STRING;
+                        bind[0].buffer = (void*)logLevel.c_str();
+                        bind[0].buffer_length = logLevel.length();
+                        
+                        // ip 参数
+                        bind[1].buffer_type = MYSQL_TYPE_STRING;
+                        bind[1].buffer = (void*)_sessions[sockfd].ip.c_str();
+                        bind[1].buffer_length = _sessions[sockfd].ip.length();
+                        
+                        // port 参数
+                        unsigned int port = _sessions[sockfd].port;
+                        bind[2].buffer_type = MYSQL_TYPE_LONG;
+                        bind[2].buffer = (void*)&port;
+                        
+                        // message 参数
+                        bind[3].buffer_type = MYSQL_TYPE_STRING;
+                        bind[3].buffer = (void*)message_content.c_str();
+                        bind[3].buffer_length = message_content.length();
+                        
+                        // 4. 绑定参数到预处理语句
+                        if (mysql_stmt_bind_param(stmt, bind)) {
+                            LogMessage::logMessage(ERROR, "mysql_stmt_bind_param() 失败: %s", mysql_stmt_error(stmt));
+                            mysql_stmt_close(stmt);
+                            continue;
+                        }
+                        
+                        // 5. 执行预处理语句
+                        if (mysql_stmt_execute(stmt)) {
+                            LogMessage::logMessage(ERROR, "mysql_stmt_execute() 失败: %s", mysql_stmt_error(stmt));
+                            mysql_stmt_close(stmt);
+                            continue;
+                        }
+                        
+                        LogMessage::logMessage(INFO, "MySQL 成功插入日志: level=%s, ip=%s, port=%u", 
+                                              logLevel.c_str(), _sessions[sockfd].ip.c_str(), port);
+                        
+                        // 6. 关闭预处理语句
+                        mysql_stmt_close(stmt);
                     }
                 }
             }
