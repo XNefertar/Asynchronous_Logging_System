@@ -41,6 +41,16 @@ EpollServer::EpollServer( uint64_t port
 
 }
 
+int EpollServer::LeveltoInt(const std::string& level) {
+    if (level == "NORMAL") return ;
+    if (level == "DEBUG") return DEBUG;
+    if (level == "INFO") return INFO;
+    if (level == "WARNING") return WARNING;
+    if (level == "ERROR") return ERROR;
+    if (level == "FATAL") return FATAL;
+    return -1; // 未知等级
+}
+
 EpollServer::~EpollServer()
 {
     if (_events != nullptr)
@@ -193,27 +203,6 @@ void EpollServer::HandleEvents(int ReadyNum){
                     std::cerr << "\033[1;31m[错误]\033[0m 日志等级解析失败" << std::endl;
                     continue;
                 }
-                std::string logLevel = message_preview.substr(pos1, pos2 - pos1 + 1);
-                // 去掉中括号
-                logLevel = logLevel.substr(1, logLevel.length() - 2);
-                // 使用std::locale C++17将字符串转换为大写
-                // std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(), ::toupper);
-                std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(),
-                                [](unsigned char c) { return std::toupper(c); });
-                // TODO: message字段需要更新
-                // TODO: 增加预处理语句, 防止SQL注入等安全问题
-                std::string message_test = "Hello World!";
-                std::string sql = "INSERT INTO log_table (level, ip, port, message) VALUES ('" + 
-                                  logLevel + "', '" + 
-                                  _sessions[sockfd].ip + "', " + 
-                                  std::to_string(_sessions[sockfd].port) + ", '" + 
-                                  message_test + "');";
-                MYSQL* conn = nullptr;
-                SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
-                if(conn){
-                    mysql_query(conn, sql.c_str());
-                    LogMessage::logMessage(INFO, "MySQL 插入日志: %s", sql.c_str());
-                }
                 
                 // 创建结构化的JSON响应
                 std::string response = "{\n";
@@ -232,6 +221,44 @@ void EpollServer::HandleEvents(int ReadyNum){
                     std::cerr << "\033[1;31m[错误]\033[0m 发送响应失败: " << strerror(errno) << std::endl;
                 } else {
                     std::cout << "\033[1;36m[响应发送]\033[0m 响应大小: " << bytes_sent << " 字节" << std::endl;
+                }
+
+                std::string logLevel = message_preview.substr(pos1, pos2 - pos1 + 1);
+                // 去掉中括号
+                logLevel = logLevel.substr(1, logLevel.length() - 2);
+                // 使用std::locale C++17将字符串转换为大写
+                // std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(), ::toupper);
+                std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(),
+                                [](unsigned char c) { return std::toupper(c); });
+                
+                if(LeveltoInt(logLevel) < 0 || LeveltoInt(logLevel) > 5){
+                    // 日志等级解析失败
+                    std::cerr << "\033[1;31m[错误]\033[0m 日志等级解析失败" << std::endl;
+                    continue;
+                }
+                if(LeveltoInt(logLevel) < LeveltoInt("WARNING")){
+                    // 日志等级小于WARNING, 不记录到数据库
+                    std::cout << "\033[1;33m[日志等级]\033[0m 日志等级小于WARNING, 不记录到数据库" << std::endl;
+                    continue;
+                }
+                else{
+                    std::cout << "\033[1;32m[日志等级]\033[0m 日志等级: " << logLevel << std::endl;
+                    // 记录到数据库
+                    std::cout << "\033[1;32m[数据库记录]\033[0m 日志记录到数据库" << std::endl;
+                    // TODO: message字段需要更新
+                    // TODO: 增加预处理语句, 防止SQL注入等安全问题
+                    std::string message_test = "Hello World!";
+                    std::string sql = "INSERT INTO log_table (level, ip, port, message) VALUES ('" + 
+                                      logLevel + "', '" + 
+                                      _sessions[sockfd].ip + "', " + 
+                                      std::to_string(_sessions[sockfd].port) + ", '" + 
+                                      message_test + "');";
+                    MYSQL* conn = nullptr;
+                    SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
+                    if(conn){
+                        mysql_query(conn, sql.c_str());
+                        LogMessage::logMessage(INFO, "MySQL 插入日志: %s", sql.c_str());
+                    }
                 }
             }
         }

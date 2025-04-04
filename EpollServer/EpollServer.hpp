@@ -54,8 +54,6 @@ namespace EpollServerSpace{
 
 
     public:
-        // TODO
-        // 路径硬编码问题
         EpollServer( uint64_t port
                    , std::string defaultUserName
                    , std::string defaultPassword
@@ -72,6 +70,8 @@ namespace EpollServerSpace{
         void ServerStart();
     
         void HandleEvents(int ReadyNum);
+
+        int LeveltoInt(const std::string& level);
 
     };
 }

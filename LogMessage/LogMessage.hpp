@@ -14,11 +14,11 @@
 #include <fcntl.h>
 
 #define NORMAL 0
-#define WARNING 1
-#define ERROR 2
-#define FATAL 3
-#define DEBUG 4
-#define INFO 5
+#define INFO 1
+#define WARNING 2
+#define ERROR 3
+#define FATAL 4
+#define DEBUG 5
 
 #define LOG_LEVEL int
 
@@ -30,8 +30,6 @@ struct LogMessage
     static void setDefaultLogPath(const std::string &path);
     static void logMessage(LOG_LEVEL level, const char *message, ...);
 };
-
-
 
 
 #endif // __LOG_MESSAGE_HPP__
