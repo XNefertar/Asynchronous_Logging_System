@@ -215,8 +215,7 @@ public:
                 
                 // 不同于TXT文件，HTML文件需要解析
                 // 考虑使用正则表达式进行解析
-                std::regex pattern(R"(<div\s+class=['"]log\s+(\w+)['"]>\[(.*?)\]\s+(.+?)\s+-\s+(.*?)<\/div>)");
-                std::smatch match;
+                std::regex pattern(R"(class='([^']*)'>\[(\w+)\]\s+(.*?)\s+at\s+([\d:-]+\s[\d:]+))");                std::smatch match;
                 std::string line;
                 // 跳过文件开头的HTML标签
                 // 读取到第一个<div>标签
@@ -232,13 +231,13 @@ public:
                 }
                 while (std::getline(file, line)) {
                     if (std::regex_search(line, match, pattern)) {
-                        std::string level = match[1];
-                        std::string timestamp = match[2];
-                        std::string ip_port = match[3];
-                        std::string message = match[4];
+                        std::string log_class = match[1];
+                        std::string level = match[2];
+                        std::string message = match[3];
+                        std::string timestamp = match[4];
                     
                         // 发送解析后的内容
-                        std::string new_content = "[" + level + "] " + timestamp + " - " + ip_port + " > " + message;
+                        std::string new_content = "<" + log_class + ">" + "[" + level + "] " + "{" + message + "}" + " at " + timestamp;
                         write(_socketfd, new_content.c_str(), new_content.size());
                         
                         // 接收服务器响应

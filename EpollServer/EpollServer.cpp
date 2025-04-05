@@ -160,6 +160,7 @@ void EpollServer::HandleEvents(int ReadyNum){
             }
             else{
                 buffer[n] = '\0';  // 确保字符串正确终止
+                std::string total_message(buffer);
                 
                 // 更新会话统计
                 _sessions[sockfd].total_bytes += n;
@@ -172,38 +173,51 @@ void EpollServer::HandleEvents(int ReadyNum){
                 std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&now_time));
                 
                 // 打印收到的消息摘要
-                std::string message_preview;
-                if (n > 50) {
-                    message_preview = std::string(buffer).substr(0, 47) + "...";
-                } else {
-                    message_preview = std::string(buffer);
+                std::string message_content;
+
+                auto message_pos1 = total_message.find('{');
+                auto message_pos2 = total_message.find('}');
+                if(message_pos1 == std::string::npos || message_pos2 == std::string::npos){
+                    std::cerr << "\033[1;31m[错误]\033[0m 消息格式错误" << std::endl;
+                    continue;
+                }
+                message_content = total_message.substr(message_pos1 + 1, message_pos2 - message_pos1);
+
+                int message_length = message_content.length();
+                if (message_length > 50) {
+                    message_content = message_content.substr(0, 47) + "...";
                 }
                 
                 // std::cout << "\033[1;32m[消息接收]\033[0m [" << time_buffer << "] " 
                 //           << _sessions[sockfd].ip << ":" << _sessions[sockfd].port << " > " << message_preview 
                 //           << " (" << n << " 字节)" << std::endl;
 
-                // 记录日志
-                _log_file << "[" << time_buffer << "] " 
-                          << _sessions[sockfd].ip << ":" << _sessions[sockfd].port << " > " 
-                          << message_preview << " (" << n << " 字节)" << std::endl;
-                _log_file.flush();
-                std::cout << "\033[1;36m[日志记录]\033[0m 日志已更新" << std::endl;
-                
                 // 记录日志到数据库
                 // 解析出日志等级字段
                 // 该内容存储在messafe_preview字段中
-                auto pos1 = message_preview.find('[');
+                auto pos1 = total_message.find('[');
                 if(pos1 == std::string::npos){
                     std::cerr << "\033[1;31m[错误]\033[0m 日志等级解析失败" << std::endl;
                     continue;
                 }
-                auto pos2 = message_preview.find(']', pos1);
+                auto pos2 = total_message.find(']', pos1);
                 if(pos2 == std::string::npos){
                     std::cerr << "\033[1;31m[错误]\033[0m 日志等级解析失败" << std::endl;
                     continue;
                 }
-                
+
+                std::string logLevel = total_message.substr(pos1, pos2 - pos1 + 1);
+                // 去掉中括号
+                logLevel = logLevel.substr(1, logLevel.length() - 2);
+
+                // 记录日志
+                _log_file << "[" << time_buffer << "] "
+                          << "[" << logLevel << "] "
+                          << _sessions[sockfd].ip << ":" << _sessions[sockfd].port << " > "
+                          << message_content << " (" << message_length << " 字节)" << std::endl;
+                _log_file.flush();
+                std::cout << "\033[1;36m[日志记录]\033[0m 日志已更新" << std::endl;
+
                 // 创建结构化的JSON响应
                 std::string response = "{\n";
                 response += "  \"status\": \"success\",\n";
@@ -223,9 +237,6 @@ void EpollServer::HandleEvents(int ReadyNum){
                     std::cout << "\033[1;36m[响应发送]\033[0m 响应大小: " << bytes_sent << " 字节" << std::endl;
                 }
 
-                std::string logLevel = message_preview.substr(pos1, pos2 - pos1 + 1);
-                // 去掉中括号
-                logLevel = logLevel.substr(1, logLevel.length() - 2);
                 // 使用std::locale C++17将字符串转换为大写
                 // std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(), ::toupper);
                 std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(),
@@ -246,10 +257,7 @@ void EpollServer::HandleEvents(int ReadyNum){
                     // 记录到数据库
                     std::cout << "\033[1;32m[数据库记录]\033[0m 日志记录到数据库" << std::endl;
                     // TODO: message字段需要更新
-                    // TODO: 增加预处理语句, 防止SQL注入等安全问题
 
-                    // 使用message_preview作为消息内容
-                    std::string message_content = message_preview;
                     
                     MYSQL* conn = nullptr;
                     SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
