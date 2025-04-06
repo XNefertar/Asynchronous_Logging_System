@@ -89,6 +89,9 @@ public:
                         continue;
                     }
                     
+                    // 客户端读取格式要求: 只需要提供日志等级和消息内容即可
+                    // 格式: [日志等级]{消息内容}, 先后顺序无所谓，只需要对应的内容有对应的包围即可
+                    
                     // 读取整个文件
                     std::stringstream tmp_buffer;
                     tmp_buffer << file.rdbuf();
@@ -115,7 +118,41 @@ public:
                         
                         // 发送新内容
                         if (!new_content.empty()) {
-                            write(_socketfd, new_content.c_str(), new_content.size());
+                            // 解析JSON字段
+                            // {""level": "INFO", "message": "This is a log message"}
+
+                            std::string send_message(new_content);
+                            auto extractValueSender = [&send_message](const std::string& key) -> std::string {
+                                size_t keyPos = send_message.find("\"" + key + "\":");
+                                if (keyPos == std::string::npos) return "未找到";
+                                
+                                size_t valueStart = send_message.find_first_not_of(" \t\n:", keyPos + key.length() + 2);
+                                if (valueStart == std::string::npos) return "解析错误";
+                                
+                                // 处理字符串
+                                if (send_message[valueStart] == '"') {
+                                    size_t valueEnd = send_message.find("\"", valueStart + 1);
+                                    if (valueEnd == std::string::npos) return "解析错误";
+                                    return send_message.substr(valueStart + 1, valueEnd - valueStart - 1);
+                                }
+                                
+                                // 处理数值、布尔值、null
+                                size_t valueEnd = send_message.find_first_of(",\n}", valueStart);
+                                if (valueEnd == std::string::npos) return "解析错误";
+                                
+                                std::string result = send_message.substr(valueStart, valueEnd - valueStart);
+                                if (result == "null") return "空值";
+                                if (result == "true") return "真";
+                                if (result == "false") return "假";
+                                
+                                return result;
+                            };
+                            std::string logLevel = extractValueSender("level");
+                            std::string message_content = extractValueSender("message");
+
+                            std::string message = "[" + logLevel + "]{" + message_content + "}";
+                            std::cout << "发送消息: " << message << std::endl;
+                            write(_socketfd, message.c_str(), message.size());
                             
                             // 接收服务器响应
                             char buffer[1024] = {0};
@@ -157,7 +194,7 @@ public:
                             // };
         
                             std::string response(buffer);
-                            auto extractValue = [&response](const std::string& key) -> std::string {
+                            auto extractValueResponse = [&response](const std::string& key) -> std::string {
                                 size_t keyPos = response.find("\"" + key + "\":");
                                 if (keyPos == std::string::npos) return "未找到";
                         
@@ -185,10 +222,10 @@ public:
                         
                             
                             // 提取并打印关键信息
-                            std::cout << "  状态: \033[1;32m" << extractValue("status") << "\033[0m" << std::endl;
-                            std::cout << "  时间戳: " << extractValue("timestamp") << std::endl;
-                            std::cout << "  消息大小: " << extractValue("message_size") << " 字节" << std::endl;
-                            std::cout << "  服务器ID: " << extractValue("server_id") << std::endl;
+                            std::cout << "  状态: \033[1;32m" << extractValueResponse("status") << "\033[0m" << std::endl;
+                            std::cout << "  时间戳: " << extractValueResponse("timestamp") << std::endl;
+                            std::cout << "  消息大小: " << extractValueResponse("message_size") << " 字节" << std::endl;
+                            std::cout << "  服务器ID: " << extractValueResponse("server_id") << std::endl;
                             std::cout << "-----------------------------" << std::endl;
                         }
                         
@@ -212,8 +249,7 @@ public:
                     exit(1);
                 }
 
-                
-                // 不同于TXT文件，HTML文件需要解析
+                // HTML文件解析
                 // 考虑使用正则表达式进行解析
                 std::regex pattern(R"(class='([^']*)'>\[(\w+)\]\s+(.*?)\s+at\s+([\d:-]+\s[\d:]+))");                std::smatch match;
                 std::string line;

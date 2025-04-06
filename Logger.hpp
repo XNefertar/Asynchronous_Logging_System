@@ -22,15 +22,19 @@ enum LogLevel{
 class Logger{
     friend class ThreadPool;
 private:
-    LogQueue m_queue;
-    std::unique_ptr<ThreadPool> m_threads;
-    std::ofstream m_file;
-    std::mutex m_mutex;
-    fs::path m_logPath;
+    std::ofstream                   m_file;
+    std::mutex                      m_mutex;
+    LogQueue                        m_queue;
+    bool                            m_isHtml;
+    fs::path                        m_logPath;
+    std::unique_ptr<ThreadPool>     m_threads;
+
 
 public:
-    Logger(const std::string& filename)
-        : m_threads(new ThreadPool(THREADS_SIZE)), m_logPath(filename)
+    Logger(const std::string& filename, bool isHtml = false)
+        : m_isHtml(isHtml)
+        , m_logPath(filename)
+        , m_threads(new ThreadPool(THREADS_SIZE))
     {
         // 确保日志文件所在目录存在
         fs::path logDir = m_logPath.parent_path();
@@ -38,10 +42,16 @@ public:
             fs::create_directories(logDir);
         }
 
+        bool fileExists = fs::exists(m_logPath);
+
         // 打开日志文件
         m_file.open(m_logPath, std::ios::out | std::ios::app);
         if(!m_file.is_open()){
             throw std::runtime_error("Failed to open log file: " + m_logPath.string());
+        }
+
+        if(isHtml && !fileExists){
+            _init_html_header();
         }
         
         // 记录日志系统启动信息
@@ -53,6 +63,14 @@ public:
         m_file << "[SYSTEM] Logger started at " << time_buffer 
                << " (File: " << fs::absolute(m_logPath).string() << ")" << std::endl;
     }
+
+    // void init_for_html() {
+    //     std::lock_guard<std::mutex> lock(m_mutex);
+    //     if (m_file.tellp() == 0) {  // 只在文件为空时添加HTML头部
+    //         _init_html_header();
+    //     }
+    //     m_isHtml = true;  // 标记为HTML文件
+    // }
 
     ~Logger(){
         m_queue.stop();
@@ -139,36 +157,38 @@ public:
         });
     }
 
-    void init_for_html(){
+private:
+    void _init_html_header()
+    {
         m_file << R"(<!DOCTYPE html>
 <html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>实时日志</title>
-    <style>
-        body {
-            font-family: monospace;
-            background-color: #1e1e1e;
-            color: #ffffff;
-            padding: 20px;
-        }
-        .log { margin: 5px 0; }
-        .info { color: #8888ff; }
-        .warning { color: #ffaa00; }
-        .error { color: #ff4444; }
-        .debug { color: #00ff00; }
-        .fatal { color: #ff00ff; }
-    </style>
-    <script>
-        function refreshPage() {
-            window.location.reload();
-        }
-        setInterval(refreshPage, 3000); // 每3秒刷新一次
-    </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>实时日志</title>
+<style>
+    body {
+        font-family: monospace;
+        background-color: #1e1e1e;
+        color: #ffffff;
+        padding: 20px;
+    }
+    .log { margin: 5px 0; }
+    .info { color: #8888ff; }
+    .warning { color: #ffaa00; }
+    .error { color: #ff4444; }
+    .debug { color: #00ff00; }
+    .fatal { color: #ff00ff; }
+</style>
+<script>
+    function refreshPage() {
+        window.location.reload();
+    }
+    setInterval(refreshPage, 3000); // 每3秒刷新一次
+</script>
 </head>
 <body>
-    <h2>实时日志</h2>
+<h2>实时日志</h2>
 )";
     }
 
@@ -209,7 +229,16 @@ private:
         std::ostringstream os;
         os.clear();
 
-        os << "[" << getLevelString(level) << "] ";
+        // 构建一个JSON格式
+        // {
+        //    "level": "INFO",
+        //    "message": "This is a log message"
+        // }
+        os << "{";
+        os << "\"level\": \"" << getLevelString(level) << "\", ";
+        os << "\"message\": \"";
+
+        // 处理message内容
         int args_index = 0, last_position = 0;
         int placeholder_index = format.find("{}");
         while(placeholder_index != std::string::npos){
@@ -228,7 +257,9 @@ private:
         while(args_index < args_str.size()){
             os << args_str[args_index++];
         }
-
+        os << "\"";
+        os << "}";
+        
         return os.str();
     }
 
@@ -243,13 +274,13 @@ private:
         std::string levelClass = getLevelClass(level);
         
         // 获取当前时间
-        auto now = std::chrono::system_clock::now();
-        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-        char time_buffer[100];
-        std::strftime(time_buffer, sizeof(time_buffer), "%a %b %d %H:%M:%S %Y", std::localtime(&now_time));
+        // auto now = std::chrono::system_clock::now();
+        // std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        // char time_buffer[100];
+        // std::strftime(time_buffer, sizeof(time_buffer), "%a %b %d %H:%M:%S %Y", std::localtime(&now_time));
         
         // 创建与样例log.html相同格式的HTML
-        os << "<div class='log " << levelClass << "'>[" << levelStr << "] " << time_buffer << " - ";
+        os << "<div class='log " << levelClass << "'>[" << levelStr << "] ";
 
         // 处理消息内容
         int args_index = 0, last_position = 0;
