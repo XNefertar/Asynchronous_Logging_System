@@ -16,6 +16,7 @@
 #include <algorithm>
 #include "../Util/Sock.hpp"
 #include "../MySQL/SqlConnPool.hpp"
+#include "../Util/SessionManager.hpp"
 
 
 namespace EpollServerSpace{
@@ -47,7 +48,7 @@ namespace EpollServerSpace{
         int                             _epollfd;
         std::ofstream                   _log_file;
         struct epoll_event*             _events;
-        std::map<int, ClientSession>    _sessions; // 存储客户端会话信息
+
         std::string                     _defaultIPAddress;
         int                             _defaultPort;
         int                             _defaultMaxConn;

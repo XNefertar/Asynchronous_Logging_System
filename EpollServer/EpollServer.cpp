@@ -25,7 +25,6 @@ EpollServer::EpollServer( uint64_t port
     , _epollfd(defaultValue)
     , _log_file(path)
     , _events(nullptr)
-    , _sessions()
     , _defaultIPAddress(defaultIPAddress)
     , _defaultPort(defaultPort)
     , _defaultMaxConn(defaultMaxConn)
@@ -82,7 +81,7 @@ void EpollServer::ServerInit(){
         exit(1);
     }
     
-    std::cout << "\033[1;32m[启动]\033[0m Epoll服务器已初始化，监听端口: " << _port << std::endl;
+    std::cout << "\033[1;32m[启动]\033[0m Epoll服务器已初始化, 监听端口: " << _port << std::endl;
 }
 
 void EpollServer::ServerStart(){
@@ -116,8 +115,8 @@ void EpollServer::HandleEvents(int ReadyNum){
             }
             
             // 创建新的客户端会话记录
-            ClientSession session = {ip, port, time(nullptr), 0, 0};
-            _sessions[connfd] = session;
+            ClientSessionInfo session = {ip, port, _defaultDBName, _defaultUserName, time(nullptr), 0, 0};
+            SessionManager::getInstance()->addSession(connfd, session);
             
             // 输出连接信息
             std::cout << "\033[1;34m[连接建立]\033[0m 客户端 " << ip << ":" << port 
@@ -129,7 +128,8 @@ void EpollServer::HandleEvents(int ReadyNum){
             if(epoll_ctl(_epollfd, EPOLL_CTL_ADD, connfd, &ev) < 0){
                 std::cerr << "\033[1;31m[错误]\033[0m 添加客户端到 epoll 失败: " << strerror(errno) << std::endl;
                 close(connfd);
-                _sessions.erase(connfd);
+                SessionManager::getInstance()->removeSession(connfd);
+                continue;
             }
         }
         else if(_events[i].events & EPOLLIN){
@@ -138,24 +138,25 @@ void EpollServer::HandleEvents(int ReadyNum){
             ssize_t n = read(sockfd, buffer, sizeof(buffer) - 1);
             
             if(n < 0){
-                std::cerr << "\033[1;31m[错误]\033[0m 客户端 " << _sessions[sockfd].ip << ":" << _sessions[sockfd].port
-                          << " 读取失败: " << strerror(errno) << std::endl;
+                std::cerr << "\033[1;31m[错误]\033[0m 客户端 " << SessionManager::getInstance()->getSession(sockfd).ip << ":" << SessionManager::getInstance()->getSession(sockfd).port
+                          << " 读取数据失败: " << strerror(errno) << std::endl;
                 close(sockfd);
                 epoll_ctl(_epollfd, EPOLL_CTL_DEL, sockfd, nullptr);
-                _sessions.erase(sockfd);
+                SessionManager::getInstance()->removeSession(sockfd);
+                continue;
             }
             else if(n == 0){
                 // 客户端断开连接
-                time_t session_duration = time(nullptr) - _sessions[sockfd].connect_time;
-                std::cout << "\033[1;33m[连接终止]\033[0m 客户端 " << _sessions[sockfd].ip << ":" << _sessions[sockfd].port
+                time_t session_duration = time(nullptr) - SessionManager::getInstance()->getSession(sockfd).connect_time;
+                std::cout << "\033[1;33m[连接终止]\033[0m 客户端 " << SessionManager::getInstance()->getSession(sockfd).ip << ":" << SessionManager::getInstance()->getSession(sockfd).port
                           << " 断开连接" << std::endl;
                 std::cout << "\033[1;36m[会话统计]\033[0m 总接收: " 
-                          << _sessions[sockfd].total_bytes << " 字节, 消息数: " << _sessions[sockfd].message_count 
+                          << SessionManager::getInstance()->getSession(sockfd).total_bytes << " 字节, 消息数: " << SessionManager::getInstance()->getSession(sockfd).message_count
                           << ", 持续时间: " << session_duration << " 秒" << std::endl;
                 
                 close(sockfd);
                 epoll_ctl(_epollfd, EPOLL_CTL_DEL, sockfd, nullptr);
-                _sessions.erase(sockfd);
+                SessionManager::getInstance()->removeSession(sockfd);
                 continue;
             }
             else{
@@ -163,8 +164,8 @@ void EpollServer::HandleEvents(int ReadyNum){
                 std::string total_message(buffer);
                 
                 // 更新会话统计
-                _sessions[sockfd].total_bytes += n;
-                _sessions[sockfd].message_count++;
+                SessionManager::getInstance()->addMessageCount(sockfd, 1);
+                SessionManager::getInstance()->addTotalBytes(sockfd, n);
                 
                 // 格式化当前时间
                 auto now = std::chrono::system_clock::now();
@@ -213,7 +214,7 @@ void EpollServer::HandleEvents(int ReadyNum){
                 // 记录日志
                 _log_file << "[" << time_buffer << "] "
                           << "[" << logLevel << "] "
-                          << _sessions[sockfd].ip << ":" << _sessions[sockfd].port << " > "
+                          << SessionManager::getInstance()->getSession(sockfd).ip << ":" << SessionManager::getInstance()->getSession(sockfd).port << " > "
                           << message_content << " (" << message_length << " 字节)" << std::endl;
                 _log_file.flush();
                 std::cout << "\033[1;36m[日志记录]\033[0m 日志已更新" << std::endl;
@@ -224,9 +225,9 @@ void EpollServer::HandleEvents(int ReadyNum){
                 response += "  \"timestamp\": \"" + std::string(time_buffer) + "\",\n";
                 response += "  \"message_size\": " + std::to_string(n) + ",\n";
                 response += "  \"server_id\": \"epoll_server_01\",\n";
-                response += "  \"client\": \"" + _sessions[sockfd].ip + ":" + std::to_string(_sessions[sockfd].port) + "\",\n";
-                response += "  \"message_number\": " + std::to_string(_sessions[sockfd].message_count) + ",\n";
-                response += "  \"total_bytes\": " + std::to_string(_sessions[sockfd].total_bytes) + "\n";
+                response += "  \"client\": \"" + SessionManager::getInstance()->getSession(sockfd).ip + ":" + std::to_string(SessionManager::getInstance()->getSession(sockfd).port) + "\",\n";
+                response += "  \"message_number\": " + std::to_string(SessionManager::getInstance()->getSession(sockfd).connect_time) + ",\n";
+                response += "  \"total_bytes\": " + std::to_string(SessionManager::getInstance()->getSession(sockfd).total_bytes) + "\n";
                 response += "}";
                 
                 // 发送响应
@@ -288,11 +289,11 @@ void EpollServer::HandleEvents(int ReadyNum){
                         
                         // ip 参数
                         bind[1].buffer_type = MYSQL_TYPE_STRING;
-                        bind[1].buffer = (void*)_sessions[sockfd].ip.c_str();
-                        bind[1].buffer_length = _sessions[sockfd].ip.length();
+                        bind[1].buffer = (void*)SessionManager::getInstance()->getSession(sockfd).ip.c_str();
+                        bind[1].buffer_length = SessionManager::getInstance()->getSession(sockfd).ip.length();
                         
                         // port 参数
-                        unsigned int port = _sessions[sockfd].port;
+                        unsigned int port = SessionManager::getInstance()->getSession(sockfd).port;
                         bind[2].buffer_type = MYSQL_TYPE_LONG;
                         bind[2].buffer = (void*)&port;
                         
@@ -316,7 +317,7 @@ void EpollServer::HandleEvents(int ReadyNum){
                         }
                         
                         LogMessage::logMessage(INFO, "MySQL 成功插入日志: level=%s, ip=%s, port=%u", 
-                                              logLevel.c_str(), _sessions[sockfd].ip.c_str(), port);
+                                              logLevel.c_str(), SessionManager::getInstance()->getSession(sockfd).ip.c_str(), port);
                         
                         // 6. 关闭预处理语句
                         mysql_stmt_close(stmt);

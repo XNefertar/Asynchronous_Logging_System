@@ -1,8 +1,13 @@
 #include "Logger.hpp"
 #include "LogQueue.hpp"
+#include "Util/SessionManager.hpp"
+#include "Util/LogTemplates.hpp"
+#include "Util/SessionManager.hpp"
 #include <exception>
 #include <random>
 #include <array>
+#include <string>
+#include <map>
 
 
 using BITMAP = const int32_t;
@@ -67,65 +72,226 @@ int main(){
     switch(option){
         case 0:
         {
-            Logger logger("log.txt");
+            Logger logger("log.txt", false);
             while(true){
                 auto now = std::chrono::system_clock::now();
                 std::time_t now_time = std::chrono::system_clock::to_time_t(now);
                 char time_buffer[100];
                 std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&now_time));
                 time_buffer[sizeof(time_buffer) - 1] = '\0'; // Ensure null-termination
-                static int index = 0;
+                
                 try{
                     TEST_FUNC(getRandomBitmap());
                 }catch(const std::out_of_range& e){
-                    logger.log_in_text(WARNING, "Out of range exception: " + std::string(e.what()) + " at " + time_buffer);
+                    // 获取一个会话信息
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("database");
+                    std::map<std::string, std::string> values = {
+                        {"table", "bitmap_table"},
+                        {"condition", "id = " + std::to_string(BITMAP_2)},
+                        {"time", "50"},
+                        {"id", std::to_string(static_cast<int>(session.connect_time))},
+                        {"txId", std::to_string(static_cast<int>(session.connect_time + session.port))},
+                        {"isolation", "READ_COMMITTED"},
+                        {"rows", std::to_string(session.total_bytes > 0 ? session.total_bytes : 1)},
+                        {"active", "5"}, {"idle", "10"}, {"waiting", "2"}, {"fields", "value,flag"}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    // logger.log_in_text(WARNING, logMsg + " - Exception: " + std::string(e.what()) + " at " + time_buffer);
+                    logger.log_in_text(WARNING, logMsg + " - Exception: " + " at " + time_buffer);
+
                 }catch(const std::length_error& e){
-                    logger.log_in_text(ERROR, "Length error exception: " + std::string(e.what()) + " at " + time_buffer);
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("network");
+                    std::map<std::string, std::string> values = {
+                        {"endpoint", "/api/bitmap"},
+                        {"method", "GET"},
+                        {"size", std::to_string(sizeof(BITMAP))},
+                        {"client", session.ip},
+                        {"source", session.ip + ":" + std::to_string(session.port)},
+                        {"status", "413"},
+                        {"time", "120"},
+                        {"protocol", "TCP"},
+                        {"connId", std::to_string(static_cast<int>(session.connect_time))},
+                        {"type", "binary"},
+                        {"reason", "size_exceeded"},
+                        {"duration", std::to_string(time(nullptr) - session.connect_time)}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    logger.log_in_text(ERROR, logMsg + " - Exception: " + std::string(e.what()) + " at " + time_buffer);
                 }catch(const std::invalid_argument& e){
-                    logger.log_in_text(ERROR, "Invalid argument exception: " + std::string(e.what()) + " at " + time_buffer);
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("auth");
+                    std::map<std::string, std::string> values = {
+                        {"user", "system_user"},
+                        {"ip", session.ip},
+                        {"resource", "bitmap_flags"},
+                        {"action", "modify"},
+                        {"userId", std::to_string(static_cast<int>(session.connect_time))},
+                        {"duration", std::to_string(time(nullptr) - session.connect_time)},
+                        {"permission", "admin"}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    logger.log_in_text(ERROR, logMsg + " - Exception: " + std::string(e.what()) + " at " + time_buffer);
                 }catch(const std::runtime_error& e){
-                    logger.log_in_text(INFO, "Runtime error exception: " + std::string(e.what()) + " at " + time_buffer);
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("system");
+                    std::map<std::string, std::string> values = {
+                        {"cpu", "15"},
+                        {"memory", "256"},
+                        {"io", "500"},
+                        {"file", "bitmap_config.json"},
+                        {"items", "10"},
+                        {"task", "process_bitmap"},
+                        {"status", "failed"},
+                        {"name", "BitmapProcessor"},
+                        {"dependencies", "LogSystem,FileSystem"},
+                        {"oldState", "running"},
+                        {"newState", "error"},
+                        {"trigger", "runtime_error"}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    logger.log_in_text(INFO, logMsg + " - Exception: " + std::string(e.what()) + " at " + time_buffer);
                 }catch(...){
-                    logger.log_in_text(WARNING, "Unknown exception: " + std::string("Unknown exception") + " at " + time_buffer);
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("system");
+                    std::map<std::string, std::string> values = {
+                        {"oldState", "running"},
+                        {"newState", "error"},
+                        {"trigger", "unknown_exception"},
+                        {"name", "BitmapProcessor"},
+                        {"status", "crashed"},
+                        {"dependencies", "unknown"}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    logger.log_in_text(WARNING, logMsg + " - Unknown exception at " + time_buffer);
                 }
                 
                 std::this_thread::sleep_for(std::chrono::seconds(1));
-                
             }
         }
         case 1:
         {
-            Logger logger("log.html");
-            logger.init_for_html();
+            Logger logger("log.html", true);
             while(true){
                 auto now = std::chrono::system_clock::now();
                 std::time_t now_time = std::chrono::system_clock::to_time_t(now);
                 char time_buffer[100];
                 std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", std::localtime(&now_time));
                 time_buffer[sizeof(time_buffer) - 1] = '\0'; // Ensure null-termination
-                static int index = 0;
+                
                 try{
                     TEST_FUNC(getRandomBitmap());
                 }catch(const std::out_of_range& e){
-                    logger.log_in_html(WARNING, "Out of range exception: " + std::string(e.what()) + " at " + time_buffer);
+                    // HTML日志使用相同的模板系统
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("database");
+                    std::map<std::string, std::string> values = {
+                        {"table", "bitmap_table"},
+                        {"condition", "id = " + std::to_string(BITMAP_2)},
+                        {"time", "50"},
+                        {"id", std::to_string(static_cast<int>(session.connect_time))},
+                        {"txId", std::to_string(static_cast<int>(session.connect_time + session.port))},
+                        {"isolation", "READ_COMMITTED"},
+                        {"rows", std::to_string(session.total_bytes > 0 ? session.total_bytes : 1)},
+                        {"active", "5"}, {"idle", "10"}, {"waiting", "2"}, {"fields", "value,flag"}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    logger.log_in_html(WARNING, logMsg + " - Exception: " + std::string(e.what()) + " at " + time_buffer);
                 }catch(const std::length_error& e){
-                    logger.log_in_html(ERROR, "Length error exception: " + std::string(e.what()) + " at " + time_buffer);
+                    // 类似的处理其他异常...
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("network");
+                    std::map<std::string, std::string> values = {
+                        {"endpoint", "/api/bitmap"},
+                        {"method", "GET"},
+                        {"size", std::to_string(sizeof(BITMAP))},
+                        {"client", session.ip},
+                        {"source", session.ip + ":" + std::to_string(session.port)},
+                        {"status", "413"},
+                        {"time", "120"},
+                        {"protocol", "TCP"},
+                        {"connId", std::to_string(static_cast<int>(session.connect_time))},
+                        {"type", "binary"},
+                        {"reason", "size_exceeded"},
+                        {"duration", std::to_string(time(nullptr) - session.connect_time)}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    logger.log_in_html(ERROR, logMsg + " - Exception: " + std::string(e.what()) + " at " + time_buffer);
                 }catch(const std::invalid_argument& e){
-                    logger.log_in_html(ERROR, "Invalid argument exception: " + std::string(e.what()) + " at " + time_buffer);
+                    // 类似处理...
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("auth");
+                    std::map<std::string, std::string> values = {
+                        {"user", "system_user"},
+                        {"ip", session.ip},
+                        {"resource", "bitmap_flags"},
+                        {"action", "modify"},
+                        {"userId", std::to_string(static_cast<int>(session.connect_time))},
+                        {"duration", std::to_string(time(nullptr) - session.connect_time)},
+                        {"permission", "admin"}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    logger.log_in_html(ERROR, logMsg + " - Exception: " + std::string(e.what()) + " at " + time_buffer);
                 }catch(const std::runtime_error& e){
-                    logger.log_in_html(INFO, "Runtime error exception: " + std::string(e.what()) + " at " + time_buffer);
+                    // 类似处理...
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("system");
+                    std::map<std::string, std::string> values = {
+                        {"cpu", "15"},
+                        {"memory", "256"},
+                        {"io", "500"},
+                        {"file", "bitmap_config.json"},
+                        {"items", "10"},
+                        {"task", "process_bitmap"},
+                        {"status", "failed"},
+                        {"name", "BitmapProcessor"},
+                        {"dependencies", "LogSystem,FileSystem"},
+                        {"oldState", "running"},
+                        {"newState", "error"},
+                        {"trigger", "runtime_error"}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    logger.log_in_html(INFO, logMsg + " - Exception: " + std::string(e.what()) + " at " + time_buffer);
                 }catch(...){
-                    logger.log_in_html(WARNING, "Unknown exception: " + std::string("Unknown exception") + " at " + time_buffer);
+                    ClientSessionInfo session = SessionManager::getInstance()->getRandomSession();
+                    
+                    std::string tmpl = LogTemplates::getRandomTemplate("system");
+                    std::map<std::string, std::string> values = {
+                        {"oldState", "running"},
+                        {"newState", "error"},
+                        {"trigger", "unknown_exception"},
+                        {"name", "BitmapProcessor"},
+                        {"status", "crashed"},
+                        {"dependencies", "unknown"}
+                    };
+                    
+                    std::string logMsg = LogTemplates::replacePlaceholders(tmpl, values);
+                    logger.log_in_html(WARNING, logMsg + " - Unknown exception at " + time_buffer);
                 }
                 
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
         }
-
     }
-    // Hello C++ World
-    // Hello C++ World {} {}
-    // Hello C++ WorldHello World
     
     std::this_thread::sleep_for(std::chrono::seconds(1));
     return 0;
