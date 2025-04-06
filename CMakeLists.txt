@@ -28,12 +28,17 @@ add_executable(epoll_server
     EpollServer/main.cpp 
     MySQL/SqlConnPool.cpp
     LogMessage/LogMessage.cpp
+    Util/SessionManager.cpp
 )
 add_executable(client 
     Client/Client.cpp
     LogMessage/LogMessage.cpp
 )
-add_executable(main main.cpp)
+add_executable(main 
+    main.cpp
+    Util/SessionManager.cpp    # 添加这一行
+    Util/LogTemplates.cpp      # 添加这一行
+)
 
 target_link_libraries(epoll_server EpollServer_Lib)
 target_link_libraries(client Client_Lib)
