@@ -62,6 +62,12 @@ public:
 
     void addMessageCount(int sockfd, size_t count);
     void addTotalBytes(int sockfd, size_t bytes);
+
+    // 更新现有会话信息
+    bool updateSession(int sockfd, const ClientSessionInfo& info);
+
+    // 获取当前会话总数
+    size_t getSessionCount() const;
 };
 
 #endif

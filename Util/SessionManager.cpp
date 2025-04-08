@@ -69,6 +69,15 @@ ClientSessionInfo SessionManager::getRandomSession() {
     return session;
 }
 
+bool SessionManager::updateSession(int sockfd, const ClientSessionInfo& session) {
+    return modifySession(sockfd, session);  // 使用现有的 modifySession 方法
+}
+
+size_t SessionManager::getSessionCount() const {
+    std::lock_guard<std::mutex> lock(_mutex);
+    return _sessions.size();
+}
+
 // 初始化静态成员
 SessionManager* SessionManager::_instance = nullptr;
 std::mutex SessionManager::_mutex;
