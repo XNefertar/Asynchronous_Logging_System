@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日志系统监控面板</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>异步日志系统监控面板</h1>
+            <div class="connection-status" id="connection-status">未连接</div>
+        </header>
+        
+        <div class="dashboard">
+            <div class="stats-panel">
+                <div class="stat-card">
+                    <h3>日志总数</h3>
+                    <div class="stat-value" id="total-logs">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>警告数</h3>
+                    <div class="stat-value warning" id="warning-logs">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>错误数</h3>
+                    <div class="stat-value error" id="error-logs">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>客户端连接数</h3>
+                    <div class="stat-value" id="client-count">0</div>
+                </div>
+            </div>
+            
+            <div class="filter-bar">
+                <input type="text" id="search-input" placeholder="搜索日志...">
+                <select id="level-filter">
+                    <option value="all">全部级别</option>
+                    <option value="INFO">INFO</option>
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="FATAL">FATAL</option>
+                </select>
+                <select id="type-filter">
+                    <option value="all">全部类型</option>
+                    <option value="auth">认证</option>
+                    <option value="database">数据库</option>
+                    <option value="network">网络</option>
+                    <option value="system">系统</option>
+                </select>
+                <button id="clear-filters">清除筛选</button>
+                <button id="refresh-logs">刷新</button>
+            </div>
+            
+            <div class="logs-container">
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>级别</th>
+                            <th>消息</th>
+                            <th>类型</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-body">
+                        <!-- 日志条目将通过 JavaScript 动态添加 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/websocket.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
