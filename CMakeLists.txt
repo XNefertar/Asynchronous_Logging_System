@@ -38,6 +38,7 @@ add_executable(webserver
 )
 
 add_executable(client 
+    Client/main.cpp
     Client/Client.cpp
     LogMessage/LogMessage.cpp
 )
