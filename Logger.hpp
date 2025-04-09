@@ -3,6 +3,7 @@
 
 #include "LogQueue.hpp"
 #include "ThreadPool.hpp"
+#include "LogMessage/LogMessage.hpp"
 #include <filesystem>
 #include <fstream>
 #include <chrono>
@@ -11,13 +12,13 @@ namespace fs = std::filesystem;
 
 const int THREADS_SIZE = 10;
 using INFO_LEVEL = int;
-enum LogLevel{
-    INFO,
-    DEBUG,
-    WARNING,
-    ERROR,
-    FATAL
-};
+// enum LogLevel{
+//     INFO,
+//     DEBUG,
+//     WARNING,
+//     ERROR,
+//     FATAL
+// };
 
 class Logger{
     friend class ThreadPool;
