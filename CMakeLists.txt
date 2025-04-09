@@ -18,9 +18,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_subdirectory(Client)
 add_subdirectory(EpollServer)
 add_subdirectory(WebSocket)
-# add_subdirectory(Server)
+add_subdirectory(Server)
 
-# add_executable(server Server/Server.cpp)
+add_executable(server
+    Server/main.cpp
+    Server/Server.cpp
+    LogMessage/LogMessage.cpp
+    Util/SessionManager.cpp
+    Util/LogTemplates.cpp
+    MySQL/SqlConnPool.cpp
+)
+
 add_executable(epoll_server 
     EpollServer/EpollServer.cpp 
     EpollServer/main.cpp 
@@ -47,6 +55,11 @@ add_executable(main
     main.cpp
     Util/SessionManager.cpp
     Util/LogTemplates.cpp
+)
+
+target_link_libraries(server 
+    Server_Lib 
+    ${OPENSSL_LIBRARIES}
 )
 
 target_link_libraries(epoll_server 
