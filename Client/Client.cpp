@@ -1,310 +1,314 @@
 #include "Client.hpp"
 
-WebSocketClient::WebSocketClient(const std::string& address, int port, int socketfd, const std::string& path)
-        : _address(address)
-        , _port(port)
-        , _socketfd(socketfd)
-        , _state(WebSocketState::CLOSED)
-        , _running(false)
-        , _log_file(path, std::ios::app)
+ClientTCP::ClientTCP(const std::string& address, int port, int socketfd)
+        : _address(address),
+          _port(port),
+          _socketfd(socketfd)
     {}
 
-WebSocketClient::~WebSocketClient() { 
-    _running = false;
-    if (_reader.joinable()) _reader.join();
-    if (_sender.joinable()) _sender.join();
-    close(_socketfd); 
-}
+ClientTCP::~ClientTCP() { close(_socketfd); }
 
-void WebSocketClient::createSocket() {
+void ClientTCP::createSocket()
+{
     _socketfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (_socketfd < 0) {
-        // std::cerr << "错误: 创建socket失败" << std::endl;
-        _log_file << "[EORROR]创建socket失败" << std::endl;
+    if (_socketfd < 0)
+    {
+        std::cerr << "Error creating socket" << std::endl;
         exit(1);
     }
-    std::cout << "socket " << _socketfd << " 已创建" << std::endl;
+    std::cout << "socket " << _socketfd << " created" << std::endl;
 }
 
-void WebSocketClient::connectToServer() {
+void ClientTCP::connectToServer()
+{
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(_port);
     server_addr.sin_addr.s_addr = inet_addr(_address.c_str());
-
-    if(connect(_socketfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        // std::cerr << "错误: 连接服务器失败" << std::endl;
-        _log_file << "[EORROR]连接服务器失败" << std::endl;
+    if(connect(_socketfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0)
+    {
+        std::cerr << "Error connecting to server" << std::endl;
         exit(1);
     }
-    std::cout << "已连接到服务器 " << _address << ":" << _port << std::endl;
+    std::cout << "connected to server" << std::endl;
 }
 
-std::string WebSocketClient::base64Encode(const unsigned char* input, int length) {
-    BIO* bmem = BIO_new(BIO_s_mem());
-    BIO* b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    BIO_push(b64, bmem);
-    BIO_write(b64, input, length);
-    BIO_flush(b64);
-    
-    BUF_MEM* bptr;
-    BIO_get_mem_ptr(b64, &bptr);
-    
-    std::string result(bptr->data, bptr->length);
-    BIO_free_all(b64);
-    
-    return result;
-}
-
-bool WebSocketClient::performWebSocketHandshake() {
-    std::string key = "dGhlIHNhbXBsZSBub25jZQ=="; // 固定key简化示例
-    
-    std::stringstream request;
-    request << "GET /ws HTTP/1.1\r\n"
-            << "Host: " << _address << ":" << _port << "\r\n"
-            << "Upgrade: websocket\r\n"
-            << "Connection: Upgrade\r\n"
-            << "Sec-WebSocket-Key: " << key << "\r\n"
-            << "Sec-WebSocket-Version: 13\r\n"
-            << "\r\n";
-            
-    std::string requestStr = request.str();
-    if (send(_socketfd, requestStr.c_str(), requestStr.length(), 0) < 0) {
-        std::cerr << "错误: 发送WebSocket握手请求失败" << std::endl;
-        return false;
-    }
-    
-    char buffer[1024] = {0};
-    int bytesReceived = recv(_socketfd, buffer, sizeof(buffer) - 1, 0);
-    if (bytesReceived <= 0) {
-        std::cerr << "错误: 接收WebSocket握手响应失败" << std::endl;
-        return false;
-    }
-    
-    std::string response(buffer);
-    if (response.find("101 Switching Protocols") != std::string::npos && 
-        response.find("Upgrade: websocket") != std::string::npos) {
-        _state = WebSocketState::OPEN;
-        // std::cout << "WebSocket连接已建立" << std::endl;
-        _log_file << "[INFO]WebSocket连接已建立" << std::endl;
-        return true;
-    }
-    
-    // std::cerr << "WebSocket握手失败. 服务器响应:\n" << response << std::endl;
-    _log_file << "[EORROR]WebSocket握手失败. 服务器响应:\n" << response << std::endl;
-    return false;
-}
-
-
-bool WebSocketClient::sendFrame(const std::string& message) {
-    if (_state != WebSocketState::OPEN) return false;
-    
-    // 简单的WebSocket帧构建 (未包含掩码)
-    std::vector<unsigned char> frame;
-    frame.push_back(0x81); // FIN=1, opcode=1 (文本)
-    
-    // 设置payload长度
-    if (message.size() < 126) {
-        frame.push_back(message.size());
-    } else if (message.size() <= 0xFFFF) {
-        frame.push_back(126);
-        frame.push_back((message.size() >> 8) & 0xFF);
-        frame.push_back(message.size() & 0xFF);
-    } else {
-        frame.push_back(127);
-        for (int i = 7; i >= 0; --i) {
-            frame.push_back((message.size() >> (i * 8)) & 0xFF);
+void ClientTCP::run() {
+    std::string last_content = ""; // 保存上次读取到的内容
+    std::ifstream file;
+    std::string option;
+    while (true) {
+        std::ifstream file("/tmp/option.flag");
+        if (file.good()) {
+            file >> option;
+            std::remove("/tmp/option.flag"); // 删除文件
+            break; // 读取到选项后退出循环
+            // 处理 option
         }
-    }
-    
-    // 添加消息内容
-    for (char c : message) {
-        frame.push_back(c);
-    }
-    
-    // 发送帧
-    if (send(_socketfd, frame.data(), frame.size(), 0) < 0) {
-        // std::cerr << "错误: 发送WebSocket消息失败" << std::endl;
-        _log_file << "[EORROR]发送WebSocket消息失败" << std::endl;
-        return false;
-    }
-    _log_file << "[INFO]已发送WebSocket消息: " << message << std::endl;
-    return true;
-}
-
-
-void WebSocketClient::startReceiving() {
-    _reader = std::thread([this]() {
-        _running = true;
-        char buffer[4096];
-        while (_running && _state == WebSocketState::OPEN) {
-            memset(buffer, 0, sizeof(buffer));
-            int bytesReceived = recv(_socketfd, buffer, sizeof(buffer) - 1, 0);
-            
-            if (bytesReceived > 0) {
-                // 处理WebSocket帧 (简化版)
-                // 在实际应用中, 需要处理掩码、分片等
-                
-                // 简单提取消息内容
-                std::string message(buffer + 2, bytesReceived - 2);
-                std::cout << "收到服务器消息: " << message << std::endl;
-            } else if (bytesReceived == 0) {
-                std::cout << "服务器关闭连接" << std::endl;
-                _state = WebSocketState::CLOSED;
-                break;
-            } else {
-                std::cerr << "接收错误: " << strerror(errno) << std::endl;
-                break;
-            }
-            
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-    });
-}
-
-
-void WebSocketClient::startSending() {
-    _sender = std::thread([this]() {
-        while (_running) {
-            std::string message;
-            {
-                std::unique_lock<std::mutex> lock(_queueMutex);
-                _queueCV.wait(lock, [this] { 
-                    return !_messageQueue.empty() || !_running; 
-                });
-                
-                if (!_running) break;
-                
-                message = _messageQueue.front();
-                _messageQueue.pop();
-            }
-            
-            if (sendFrame(message)) {
-                // std::cout << "已发送消息: " << message << std::endl;
-                _log_file << "[INFO]已发送消息: " << message << std::endl;
-            }
-        }
-    });
-}
-
-
-
-void WebSocketClient::monitorLogFile() {
-    std::regex txtPattern(R"(\[(\w+)\]\{(.*?)\} at (.*))");
-    std::regex htmlPattern(R"(class='([^']*)'>\[(\w+)\]\s+(.*?)\s+at\s+([\d:-]+\s[\d:]+))");
-    
-    bool isHtml = _logFilePath.find(".html") != std::string::npos;
-    std::regex& pattern = isHtml ? htmlPattern : txtPattern;
-    
-    while (_running) {
-        std::ifstream file(_logFilePath);
-        if (!file.is_open()) {
-            std::cerr << "无法打开日志文件: " << _logFilePath << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            continue;
-        }
-        
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string content = buffer.str();
-        file.close();
-        
-        // 检查文件是否有更新
-        if (content != _lastContent) {
-            // 处理新增内容
-            std::string newContent;
-            if (_lastContent.empty()) {
-                newContent = content;
-            } else if (content.length() > _lastContent.length() && 
-                       content.substr(0, _lastContent.length()) == _lastContent) {
-                newContent = content.substr(_lastContent.length());
-            } else {
-                newContent = content;
-            }
-            
-            // 解析日志条目
-            std::smatch match;
-            std::istringstream stream(newContent);
-            std::string line;
-            
-            while (std::getline(stream, line)) {
-                if (std::regex_search(line, match, pattern)) {
-                    std::string level = isHtml ? match[2] : match[1];
-                    std::string message = isHtml ? match[3] : match[2];
-                    std::string timestamp = isHtml ? match[4] : match[3];
-                    
-                    // 创建JSON格式的日志消息
-                    std::string jsonLog = "{\n";
-                    jsonLog += "\"level\": \"" + level + "\",\n";
-                    jsonLog += "\"message\": \"" + message + "\",\n";
-                    jsonLog += "\"timestamp\": \"" + timestamp + "\"\n";
-                    jsonLog += "}";
-                    
-                    _log_file << "[INFO]解析到日志: " << jsonLog << std::endl;
-                    queueMessage(jsonLog);
-                }
-            }
-            
-            _lastContent = content;
-        }
-        
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-}
+    std::cout << "option = " << option << std::endl;
+    switch(stoi(option)){
+        case 0:
+        {
+            for(;;) {
+                // 每次循环重新打开文件
+                std::string path = std::filesystem::current_path().string() + "/log.txt";
+                file.open(path);
+                if (!file.is_open()) {
+                    std::cerr << "Error opening file" << std::endl;
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    continue;
+                }
+                
+                // 客户端读取格式要求: 只需要提供日志等级和消息内容即可
+                // 格式: [日志等级]{消息内容}, 先后顺序无所谓，只需要对应的内容有对应的包围即可
+                
+                // 读取整个文件
+                std::stringstream tmp_buffer;
+                tmp_buffer << file.rdbuf();
+                file.close(); // 关闭文件
+                
+                std::string current_content = tmp_buffer.str();
+                
+                // 文件内容有变化
+                if (!current_content.empty() && current_content != last_content) {
+                    // 只发送新增的内容
+                    std::string new_content;
+                    if (last_content.empty()) {
+                        new_content = current_content; // 首次读取，发送全部内容
+                    } else {
+                        // 找出新增内容
+                        if (current_content.length() > last_content.length() && 
+                            current_content.substr(0, last_content.length()) == last_content) {
+                            new_content = current_content.substr(last_content.length());
+                        } else {
+                            // 文件内容完全变化，发送全部
+                            new_content = current_content;
+                        }
+                    }
+                    
+                    // 发送新内容
+                    if (!new_content.empty()) {
+                        // 解析JSON字段
+                        // {"level": "INFO", "message": "This is a log message"}
 
+                        std::string send_message(new_content);
+                        auto extractValueSender = [&send_message](const std::string& key) -> std::string {
+                            size_t keyPos = send_message.find("\"" + key + "\":");
+                            if (keyPos == std::string::npos) return "未找到";
+                            
+                            size_t valueStart = send_message.find_first_not_of(" \t\n:", keyPos + key.length() + 2);
+                            if (valueStart == std::string::npos) return "解析错误";
+                            
+                            // 处理字符串
+                            if (send_message[valueStart] == '"') {
+                                size_t valueEnd = send_message.find("\"", valueStart + 1);
+                                if (valueEnd == std::string::npos) return "解析错误";
+                                return send_message.substr(valueStart + 1, valueEnd - valueStart - 1);
+                            }
+                            
+                            // 处理数值、布尔值、null
+                            size_t valueEnd = send_message.find_first_of(",\n}", valueStart);
+                            if (valueEnd == std::string::npos) return "解析错误";
+                            
+                            std::string result = send_message.substr(valueStart, valueEnd - valueStart);
+                            if (result == "null") return "空值";
+                            if (result == "true") return "真";
+                            if (result == "false") return "假";
+                            
+                            return result;
+                        };
+                        std::string logLevel = extractValueSender("level");
+                        std::string message_content = extractValueSender("message");
 
-void WebSocketClient::queueMessage(const std::string& message) {
-    std::lock_guard<std::mutex> lock(_queueMutex);
-    _messageQueue.push(message);
-    _queueCV.notify_one();
-}
+                        std::string message = "[" + logLevel + "]{" + message_content + "}";
+                        std::cout << "发送消息: " << message << std::endl;
+                        write(_socketfd, message.c_str(), message.size());
+                        
+                        // 接收服务器响应
+                        char buffer[1024] = {0};
+                        ssize_t n = recv(_socketfd, buffer, sizeof(buffer) - 1, 0);
+                        if (n < 0) {
+                            std::cerr << "接收服务器响应失败. 错误码: " << errno << std::endl;
+                            exit(1);
+                        } else if (n == 0) {
+                            std::cerr << "服务器已关闭连接" << std::endl;
+                            exit(1);
+                        }
+                        buffer[n] = '\0';
+                        
+                        // 解析并显示JSON响应
+                        std::cout << "服务器响应: " << std::endl;
+    
+                        std::string path = std::filesystem::current_path().string() + "/Log/Client.txt";
+                        LogMessage::setDefaultLogPath(path);
+                        LogMessage::logMessage(INFO, "接收服务器响应: %s", buffer);
+                        
+                        // 简单解析JSON (不使用外部库)
+                        // std::string response(buffer);
+                        // auto extractValue = [&response](const std::string& key) -> std::string {
+                        //     size_t keyPos = response.find("\"" + key + "\":");
+                        //     if (keyPos == std::string::npos) return "未找到";
+                            
+                        //     size_t valueStart = response.find("\"", keyPos + key.length() + 2);
+                        //     if (valueStart == std::string::npos) {
+                        //         // 可能是数字值
+                        //         valueStart = response.find_first_not_of(" \t\n:", keyPos + key.length() + 1);
+                        //         size_t valueEnd = response.find_first_of(",\n}", valueStart);
+                        //         if (valueEnd == std::string::npos) return "解析错误";
+                        //         return response.substr(valueStart, valueEnd - valueStart);
+                        //     } else {
+                        //         size_t valueEnd = response.find("\"", valueStart + 1);
+                        //         if (valueEnd == std::string::npos) return "解析错误";
+                        //         return response.substr(valueStart + 1, valueEnd - valueStart - 1);
+                        //     }
+                        // };
+    
+                        std::string response(buffer);
+                        auto extractValueResponse = [&response](const std::string& key) -> std::string {
+                            size_t keyPos = response.find("\"" + key + "\":");
+                            if (keyPos == std::string::npos) return "未找到";
+                    
+                            size_t valueStart = response.find_first_not_of(" \t\n:", keyPos + key.length() + 2);
+                            if (valueStart == std::string::npos) return "解析错误";
+                    
+                            // 处理字符串
+                            if (response[valueStart] == '"') {
+                                size_t valueEnd = response.find("\"", valueStart + 1);
+                                if (valueEnd == std::string::npos) return "解析错误";
+                                return response.substr(valueStart + 1, valueEnd - valueStart - 1);
+                            }
+                    
+                            // 处理数值、布尔值、null
+                            size_t valueEnd = response.find_first_of(",\n}", valueStart);
+                            if (valueEnd == std::string::npos) return "解析错误";
+                    
+                            std::string result = response.substr(valueStart, valueEnd - valueStart);
+                            if (result == "null") return "空值";
+                            if (result == "true") return "真";
+                            if (result == "false") return "假";
+                    
+                            return result;
+                        };
+                    
+                        
+                        // 提取并打印关键信息
+                        std::cout << "  状态: \033[1;32m" << extractValueResponse("status") << "\033[0m" << std::endl;
+                        std::cout << "  时间戳: " << extractValueResponse("timestamp") << std::endl;
+                        std::cout << "  消息大小: " << extractValueResponse("message_size") << " 字节" << std::endl;
+                        std::cout << "  服务器ID: " << extractValueResponse("server_id") << std::endl;
+                        std::cout << "-----------------------------" << std::endl;
+                    }
+                    
+                    last_content = current_content; // 更新上次内容
+                }
+                
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+        }
+        case 1:
+        {
+            std::string log_path = std::filesystem::current_path().string() + "/Log/Client.txt";
+            LogMessage::setDefaultLogPath(log_path);
+            std::string path = std::filesystem::current_path().string() + "/log.html";
+            // std::cout << "path = " << path << std::endl;
+            // LogMessage::setDefaultLogPath(path);
 
-void WebSocketClient::setLogFilePath(const std::string& path) {
-    _logFilePath = path;
-}
+            file.open(path);
+            if(!file.is_open()) {
+                std::cerr << "Error opening file" << std::endl;
+                exit(1);
+            }
 
+            // HTML文件解析
+            // 考虑使用正则表达式进行解析
+            std::regex pattern(R"(class='([^']+)'>\[(\w+)\]\s+(.*?)\s+at\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}))");
+            std::smatch match;
+            std::string line;
+            // 跳过文件开头的HTML标签
+            // 读取到第一个<div>标签
+            // 使用了seekg和tellg来定位到第一个<div>标签
+            // 这样可以避免读取整个文件
+            // 优化处理时间
+            while (std::getline(file, line)) {
+                size_t pos = line.find("<div");
+                if (pos != std::string::npos) {
+                    file.seekg(file.tellg() - std::streamoff(line.size() - pos)); // 定位到第一个<div>标签
+                    break;
+                }
+            }
+            while (std::getline(file, line)) {
+                if (std::regex_search(line, match, pattern)) {
+                    std::string log_class = match[1];
+                    std::string level = match[2];
+                    std::string message = match[3];
+                    std::string timestamp = match[4];
+                    LogMessage::logMessage(INFO, "解析到日志等级: %s, 消息: %s, 时间戳: %s", level.c_str(), message.c_str(), timestamp.c_str());
+                    std::cout << "解析到日志等级: " << log_class << ", 消息: " << message << ", 时间戳: " << timestamp << std::endl;
+                
+                    // 发送解析后的内容
+                    std::string new_content = "<" + log_class + ">" + "[" + level + "] " + "{" + message + "}" + " at " + timestamp;
+                    write(_socketfd, new_content.c_str(), new_content.size());
+                    
+                    // 接收服务器响应
+                    char buffer[1024] = {0};
+                    ssize_t n = recv(_socketfd, buffer, sizeof(buffer) - 1, 0);
+                    if (n < 0) {
+                        std::cerr << "接收服务器响应失败. 错误码: " << errno << std::endl;
+                        exit(1);
+                    } else if (n == 0) {
+                        std::cerr << "服务器已关闭连接" << std::endl;
+                        exit(1);
+                    }
+                    buffer[n] = '\0';
+                    
+                    // 解析并显示JSON响应
+                    std::cout << "服务器响应: " << std::endl;
+                    std::string response(buffer);
+                    auto extractValue = [&response](const std::string& key) -> std::string {
+                        size_t keyPos = response.find("\"" + key + "\":");
+                        if (keyPos == std::string::npos) return "未找到";
 
-void WebSocketClient::run() {
-    // 执行WebSocket握手
-    if (!performWebSocketHandshake()) {
-        std::cerr << "WebSocket握手失败, 无法继续" << std::endl;
-        return;
+                        size_t valueStart = response.find_first_not_of(" \t\n:", keyPos + key.length() + 2);
+                        if (valueStart == std::string::npos) return "解析错误";
+
+                        // 处理字符串
+                        if (response[valueStart] == '"') {
+                            size_t valueEnd = response.find("\"", valueStart + 1);
+                            if (valueEnd == std::string::npos) return "解析错误";
+                            return response.substr(valueStart + 1, valueEnd - valueStart - 1);
+                        }
+
+                        // 处理数值、布尔值、null
+                        size_t valueEnd = response.find_first_of(",\n}", valueStart);
+                        if (valueEnd == std::string::npos) return "解析错误";
+
+                        std::string result = response.substr(valueStart, valueEnd - valueStart);
+                        if (result == "null") return "空值";
+                        if (result == "true") return "真";
+                        if (result == "false") return "假";
+
+                        return result;
+                    };
+
+                    // 提取并打印关键信息
+                    std::cout << "  状态: \033[1;32m" << extractValue("status") << "\033[0m" << std::endl;
+                    std::cout << "  时间戳: " << extractValue("timestamp") << std::endl;
+                    std::cout << "  消息大小: " << extractValue("message_size") << " 字节" << std::endl;
+                    std::cout << "  服务器ID: " << extractValue("server_id") << std::endl;
+                    std::cout << "-----------------------------" << std::endl;
+    
+                    LogMessage::logMessage(INFO, "接收服务器响应: %s", buffer);
+                    
+                }
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+            file.close(); // 关闭文件
+        }
+        default:
+            std::cerr << "Invalid log option" << std::endl;
+            exit(1);
     }
     
-    // // 确定日志文件路径
-    // if (_logFilePath.empty()) {
-    //     std::ifstream file("/tmp/option.flag");
-    //     std::string option;
-    //     if (file.good()) {
-    //         file >> option;
-    //         file.close();
-            
-    //         if (option == "0") {
-    //             _logFilePath = std::filesystem::current_path().string() + "/log.txt";
-    //         } else if (option == "1") {
-    //             _logFilePath = std::filesystem::current_path().string() + "/log.html";
-    //         } else {
-    //             std::cerr << "无效的日志选项: " << option << std::endl;
-    //             return;
-    //         }
-    //     } else {
-    //         // 默认为文本日志
-    //         _logFilePath = std::filesystem::current_path().string() + "/log.txt";
-    //     }
-        
-    //     std::cout << "监控日志文件: " << _logFilePath << std::endl;
-    // }
-
-    _log_file << "[INFO]监控日志文件: " << _logFilePath << std::endl;
-    
-    // 启动接收线程
-    startReceiving();
-    
-    // 启动发送线程
-    startSending();
-    
-    // 监控日志文件
-    _running = true;
-    monitorLogFile();
 }
