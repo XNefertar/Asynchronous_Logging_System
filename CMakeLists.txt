@@ -29,13 +29,13 @@ add_executable(server
     MySQL/SqlConnPool.cpp
 )
 
-add_executable(epoll_server 
-    EpollServer/EpollServer.cpp 
-    EpollServer/main.cpp 
-    MySQL/SqlConnPool.cpp
-    LogMessage/LogMessage.cpp
-    Util/SessionManager.cpp
-)
+# add_executable(epoll_server 
+#     EpollServer/EpollServer.cpp 
+#     EpollServer/main.cpp 
+#     MySQL/SqlConnPool.cpp
+#     LogMessage/LogMessage.cpp
+#     Util/SessionManager.cpp
+# )
 
 add_executable(webserver
     WebSocket/WebSocketServer.cpp
@@ -62,10 +62,10 @@ target_link_libraries(server
     ${OPENSSL_LIBRARIES}
 )
 
-target_link_libraries(epoll_server 
-    EpollServer_Lib 
-    ${OPENSSL_LIBRARIES}
-)
+# target_link_libraries(epoll_server 
+#     EpollServer_Lib 
+#     ${OPENSSL_LIBRARIES}
+# )
 
 target_link_libraries(webserver
     WebSocket_Lib
