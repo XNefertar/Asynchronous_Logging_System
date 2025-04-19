@@ -29,15 +29,15 @@ epoll，是IO多路转接的一种模式，属于五种常用的IO模式的一�
 
 __单Reactor 单进程/线程__
 
-![image-20250416003527444](C:\Users\34955\AppData\Roaming\Typora\typora-user-images\image-20250416003527444.png)
+![image1](./PNG/Single_Reactor_Single_Process.png)
 
 __单Reactor 多进程/线程__
 
-![image-20250416003558002](C:\Users\34955\AppData\Roaming\Typora\typora-user-images\image-20250416003558002.png)
+![image2](./PNG/Single_Reactor_Multi_Process.png)
 
 __多Reactor 多进程/多线程__
 
-![image-20250416003628637](C:\Users\34955\AppData\Roaming\Typora\typora-user-images\image-20250416003628637.png)
+![image3](./PNG/Multi_Reactor_Multi_Process.png)
 
 ## 组件介绍
 
