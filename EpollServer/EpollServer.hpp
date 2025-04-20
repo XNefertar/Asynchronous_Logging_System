@@ -42,6 +42,8 @@ namespace EpollServerSpace {
     // };
     
     // HTTP 请求方法枚举
+    // class 强枚举类型
+    // 防止枚举类型冲突
     enum class HttpMethod {
         GET,
         POST,
