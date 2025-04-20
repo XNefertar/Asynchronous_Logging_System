@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>实时日志</title>
+<style>
+    body {
+        font-family: monospace;
+        background-color: #1e1e1e;
+        color: #ffffff;
+        padding: 20px;
+    }
+    .log { margin: 5px 0; }
+    .info { color: #8888ff; }
+    .warning { color: #ffaa00; }
+    .error { color: #ff4444; }
+    .debug { color: #00ff00; }
+    .fatal { color: #ff00ff; }
+</style>
+<script>
+    function refreshPage() {
+        window.location.reload();
+    }
+    setInterval(refreshPage, 3000); // 每3秒刷新一次
+</script>
+</head>
+<body>
+<h2>实时日志</h2>
+[SYSTEM] Logger started at 2025-04-21 00:50:07 (File: /home/xl/repositories/Asynchronous_Logging_System/log.html)
+<div class='log error'>[ERROR] Connection closed - Client: localhost, Reason: size_exceeded, Duration: 0 seconds - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:07</div>
+<div class='log error'>[ERROR] Password reset request - User ID: 1745167808 - Exception: bitmap & BITMAP_4 at 2025-04-21 00:50:08</div>
+<div class='log info'>[INFO] System resource usage - CPU: 15%, Memory: 256MB, Disk IO: 500KB/s - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:09</div>
+<div class='log error'>[ERROR] Connection closed - Client: localhost, Reason: size_exceeded, Duration: 0 seconds - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:10</div>
+<div class='log warning'>[WARNING] Record updated - Table: bitmap_table, ID: 1745167811, Fields: value,flag - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:11</div>
+<div class='log warning'>[WARNING] Database query executed - Table: bitmap_table, Condition: id = 2, Duration: 50ms - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:12</div>
+<div class='log info'>[INFO] System state changed - From: running, To: error, Trigger: runtime_error - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:13</div>
+<div class='log error'>[ERROR] User system_user login attempt [IP: localhost] - Exception: bitmap & BITMAP_4 at 2025-04-21 00:50:14</div>
+<div class='log info'>[INFO] System resource usage - CPU: 15%, Memory: 256MB, Disk IO: 500KB/s - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:15</div>
+<div class='log error'>[ERROR] Request received - Endpoint: /api/bitmap, Method: GET, Size: 4 bytes - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:16</div>
+<div class='log info'>[INFO] Configuration loaded - File: bitmap_config.json, Items: 10 - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:17</div>
+<div class='log error'>[ERROR] Connection closed - Client: localhost, Reason: size_exceeded, Duration: 0 seconds - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:18</div>
+<div class='log warning'>[WARNING] Transaction committed - ID: 1745180164, Affected rows: 1 - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:19</div>
+<div class='log info'>[INFO] System state changed - From: running, To: error, Trigger: runtime_error - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:20</div>
+<div class='log error'>[ERROR] User system_user login attempt [IP: localhost] - Exception: bitmap & BITMAP_4 at 2025-04-21 00:50:21</div>
+<div class='log info'>[INFO] System resource usage - CPU: 15%, Memory: 256MB, Disk IO: 500KB/s - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:22</div>
+<div class='log error'>[ERROR] Request received - Endpoint: /api/bitmap, Method: GET, Size: 4 bytes - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:23</div>
+<div class='log error'>[ERROR] Data received - Source: localhost:12345, Size: 4 bytes, Type: binary - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:24</div>
+<div class='log info'>[INFO] Component initialization - Name: BitmapProcessor, Status: failed, Dependencies: LogSystem,FileSystem - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:25</div>
+<div class='log warning'>[WARNING] Record updated - Table: bitmap_table, ID: 1745167826, Fields: value,flag - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:26</div>
+<div class='log error'>[ERROR] Connection established - Client: localhost, Protocol: TCP, Connection ID: 1745167827 - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:27</div>
+<div class='log warning'>[WARNING] Transaction committed - ID: 1745180173, Affected rows: 1 - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:28</div>
+<div class='log info'>[INFO] System resource usage - CPU: 15%, Memory: 256MB, Disk IO: 500KB/s - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:29</div>
+<div class='log error'>[ERROR] Connection closed - Client: localhost, Reason: size_exceeded, Duration: 0 seconds - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:30</div>
+<div class='log error'>[ERROR] Password reset request - User ID: 1745167831 - Exception: bitmap & BITMAP_4 at 2025-04-21 00:50:31</div>
+<div class='log error'>[ERROR] Data received - Source: localhost:12345, Size: 4 bytes, Type: binary - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:32</div>
+<div class='log error'>[ERROR] Connection established - Client: localhost, Protocol: TCP, Connection ID: 1745167833 - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:33</div>
+<div class='log warning'>[WARNING] Database query executed - Table: bitmap_table, Condition: id = 2, Duration: 50ms - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:34</div>
+<div class='log warning'>[WARNING] Transaction committed - ID: 1745180180, Affected rows: 1 - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:35</div>
+<div class='log error'>[ERROR] Connection closed - Client: localhost, Reason: size_exceeded, Duration: 0 seconds - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:36</div>
+<div class='log error'>[ERROR] Request received - Endpoint: /api/bitmap, Method: GET, Size: 4 bytes - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:37</div>
+<div class='log info'>[INFO] System state changed - From: running, To: error, Trigger: runtime_error - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:38</div>
+<div class='log warning'>[WARNING] Database query executed - Table: bitmap_table, Condition: id = 2, Duration: 50ms - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:39</div>
+<div class='log error'>[ERROR] Connection established - Client: localhost, Protocol: TCP, Connection ID: 1745167840 - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:40</div>
+<div class='log warning'>[WARNING] Record updated - Table: bitmap_table, ID: 1745167841, Fields: value,flag - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:41</div>
+<div class='log warning'>[WARNING] Database query executed - Table: bitmap_table, Condition: id = 2, Duration: 50ms - Exception: bitmap & BITMAP_2 at 2025-04-21 00:50:42</div>
+<div class='log error'>[ERROR] Password reset request - User ID: 1745167843 - Exception: bitmap & BITMAP_4 at 2025-04-21 00:50:43</div>
+<div class='log error'>[ERROR] Connection closed - Client: localhost, Reason: size_exceeded, Duration: 0 seconds - Exception: bitmap & BITMAP_3 at 2025-04-21 00:50:44</div>
+<div class='log info'>[INFO] Component initialization - Name: BitmapProcessor, Status: failed, Dependencies: LogSystem,FileSystem - Exception: bitmap & BITMAP_1 at 2025-04-21 00:50:45</div>

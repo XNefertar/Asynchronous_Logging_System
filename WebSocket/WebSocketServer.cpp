@@ -101,9 +101,12 @@ int main(int argc, char* argv[]) {
     // 添加 API 端点处理器
     g_server->addGetHandler("/api/logs", handleLogsApi);
     g_server->addGetHandler("/api/stats", handleStatsApi);
-    
+    // 添加日志文件下载API
+    g_server->addGetHandler("/api/download-log", handleLogFileDownload);
+
     // 设置 WebSocket 处理器
     g_server->setWebSocketHandler("/ws", handleWebSocketMessage);
+    
     
     // 初始化并启动服务器
     g_server->ServerInit();

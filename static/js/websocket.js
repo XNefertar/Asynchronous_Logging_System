@@ -87,3 +87,22 @@ function updateStatCounter(level) {
         errorElement.textContent = Number(errorElement.textContent) + 1;
     }
 }
+
+function downloadLogFile(fileType) {
+    // 创建下载URL
+    const downloadUrl = `/api/download-log?type=${fileType}`;
+    
+    // 创建一个临时的a元素来触发下载
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `log.${fileType}`; // 设置下载文件名
+    
+    // 添加到文档并模拟点击
+    document.body.appendChild(link);
+    link.click();
+    
+    // 清理DOM
+    setTimeout(() => {
+        document.body.removeChild(link);
+    }, 100);
+}

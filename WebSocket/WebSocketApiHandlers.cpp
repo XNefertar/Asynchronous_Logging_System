@@ -211,3 +211,38 @@ void insertWebSocketMessage(int sockfd, const std::string& message, ClientSessio
         send(sockfd, frame.data(), frame.size(), 0);
     }
 }
+
+HttpResponse handleLogFileDownload(const HttpRequest& request, ClientSession& session) {
+    HttpResponse response;
+    
+    // 获取查询参数中指定的文件类型
+    std::string fileType = "html"; // 默认html
+    if (request.queryParams.find("type") != request.queryParams.end()) {
+        fileType = request.queryParams.at("type");
+    }
+    
+    std::string filePath = std::filesystem::current_path().string() + "/log." + fileType;
+    
+    // 检查文件是否存在
+    if (!std::filesystem::exists(filePath)) {
+        response.statusCode = 404;
+        response.statusText = "Not Found";
+        response.body = "Log file not found";
+        return response;
+    }
+    
+    // 读取文件内容
+    std::ifstream file(filePath, std::ios::binary);
+    std::ostringstream contentStream;
+    contentStream << file.rdbuf();
+    response.body = contentStream.str();
+    
+    // 设置响应头
+    response.statusCode = 200;
+    response.statusText = "OK";
+    response.headers["Content-Type"] = (fileType == "html") ? "text/html" : "text/plain";
+    response.headers["Content-Disposition"] = "attachment; filename=\"log." + fileType + "\"";
+    response.headers["Content-Length"] = std::to_string(response.body.size());
+    
+    return response;
+}

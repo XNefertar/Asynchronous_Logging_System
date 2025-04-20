@@ -18,4 +18,6 @@ void broadcastLogUpdate(const std::string& level, const std::string& message);
 // 数据库插入日志功能
 void insertWebSocketMessage(int sockfd, const std::string& message, ClientSession& session);
 
+HttpResponse handleLogFileDownload(const HttpRequest& request, ClientSession& session);
+
 #endif // __WEBSOCKET_API_HANDLERS_HPP__
