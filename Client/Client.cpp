@@ -8,6 +8,88 @@ ClientTCP::ClientTCP(const std::string& address, int port, int socketfd)
 
 ClientTCP::~ClientTCP() { close(_socketfd); }
 
+int ClientTCP::getPort() const {return _port;}
+int ClientTCP::getSocketfd() const {return _socketfd;}
+std::string ClientTCP::getHost() const {return _address;}
+
+// 连接到服务器，返回是否成功
+bool ClientTCP::Connect() {
+    try {
+        // 如果套接字未创建，先创建套接字
+        if (_socketfd < 0) {
+            createSocket();
+        }
+        
+        // 设置服务器地址
+        struct sockaddr_in serverAddr;
+        memset(&serverAddr, 0, sizeof(serverAddr));
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_port = htons(_port);
+        serverAddr.sin_addr.s_addr = inet_addr(_address.c_str());
+        
+        // 连接到服务器
+        if (::connect(_socketfd, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+            std::cerr << "连接服务器失败: " << strerror(errno) << std::endl;
+            return false;
+        }
+        
+        return true;
+    } catch (std::exception& e) {
+        std::cerr << "连接异常: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// 发送数据，返回发送的字节数
+ssize_t ClientTCP::sendData(const std::string& data) {
+    if (_socketfd < 0) {
+        std::cerr << "发送前套接字无效" << std::endl;
+        return -1;
+    }
+    
+    ssize_t bytesSent = send(_socketfd, data.c_str(), data.length(), 0);
+    if (bytesSent < 0) {
+        std::cerr << "发送数据失败: " << strerror(errno) << std::endl;
+    }
+    
+    return bytesSent;
+}
+
+// 接收数据，返回接收到的字符串
+std::string ClientTCP::receiveData() {
+    if (_socketfd < 0) {
+        std::cerr << "接收前套接字无效" << std::endl;
+        return "";
+    }
+    
+    char buffer[4096] = {0};
+    ssize_t bytesRead = recv(_socketfd, buffer, sizeof(buffer) - 1, 0);
+    
+    if (bytesRead <= 0) {
+        if (bytesRead == 0) {
+            std::cerr << "连接已关闭" << std::endl;
+        } else {
+            std::cerr << "接收数据失败: " << strerror(errno) << std::endl;
+        }
+        return "";
+    }
+    
+    return std::string(buffer, bytesRead);
+}
+
+// 断开连接
+void ClientTCP::disConnect() {
+    if (_socketfd >= 0) {
+        close(_socketfd);
+        _socketfd = -1;
+    }
+    
+    // 如果读取线程正在运行，等待它结束
+    if (_reader.joinable()) {
+        _reader.join();
+    }
+}
+
 void ClientTCP::createSocket()
 {
     _socketfd = socket(AF_INET, SOCK_STREAM, 0);

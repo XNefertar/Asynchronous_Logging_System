@@ -115,6 +115,31 @@ void EpollServer::ServerStart(){
     }
 }
 
+void EpollServer::ServerStop(){
+    if (_listenfd != defaultValue) {
+        close(_listenfd);
+        _listenfd = defaultValue;
+    }
+
+    if (_epollfd != defaultValue) {
+        close(_epollfd);
+        _epollfd = defaultValue;
+    }
+
+    if (_events != nullptr) {
+        delete[] _events;
+        _events = nullptr;
+    }
+
+    // 关闭所有 WebSocket 连接
+    for (int sockfd : _wsConnections) {
+        close(sockfd);
+    }
+    _wsConnections.clear();
+
+    std::cout << "\033[1;33m[停止]\033[0m 服务器已停止" << std::endl;
+}
+
 void EpollServer::HandleEvents(int ReadyNum) {
     for(int i = 0; i < ReadyNum; ++i) {
         int sockfd = _events[i].data.fd;
@@ -466,6 +491,29 @@ std::vector<char> EpollServer::createWebSocketFrame(const std::string& message, 
     }
     
     return frame;
+}
+
+
+void EpollServer::sendWebSocketMessage(int sockfd, const std::string& message) {
+    // Example implementation for sending a WebSocket message
+    std::vector<char> frame;
+    frame.push_back(0x81); // FIN=1, Opcode=1 (text)
+
+    if (message.size() < 126) {
+        frame.push_back(static_cast<char>(message.size()));
+    } else if (message.size() < 65536) {
+        frame.push_back(126);
+        frame.push_back(static_cast<char>((message.size() >> 8) & 0xFF));
+        frame.push_back(static_cast<char>(message.size() & 0xFF));
+    } else {
+        frame.push_back(127);
+        for (int i = 7; i >= 0; i--) {
+            frame.push_back(static_cast<char>((message.size() >> (i * 8)) & 0xFF));
+        }
+    }
+
+    frame.insert(frame.end(), message.begin(), message.end());
+    send(sockfd, frame.data(), frame.size(), 0);
 }
 
 // 处理 WebSocket 数据帧

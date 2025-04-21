@@ -142,7 +142,7 @@ namespace EpollServerSpace {
         WebSocketHandler                _wsHandler;           // WebSocket 消息处理器
         std::set<int>                   _wsConnections;       // WebSocket 连接列表
 
-    private:
+    public:
         // HTTP 相关方法
         bool parseHttpRequest(const std::string& requestStr, HttpRequest& request);
         std::string serializeHttpResponse(const HttpResponse& response);
@@ -172,6 +172,7 @@ namespace EpollServerSpace {
         
         void ServerInit();
         void ServerStart();
+        void ServerStop();
         void HandleEvents(int ReadyNum);
         int LeveltoInt(const std::string& level);
         
@@ -182,6 +183,7 @@ namespace EpollServerSpace {
         void setStaticFilesDir(const std::string& dir);
         
         // WebSocket相关公共方法
+        void sendWebSocketMessage(int sockfd, const std::string& message);
         void broadcastWebSocketMessage(const std::string& message);
         std::vector<char> createWebSocketFrame(const std::string& message, WebSocketOpcode opcode = WebSocketOpcode::TEXT);
     };
