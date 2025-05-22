@@ -26,6 +26,9 @@ std::vector<std::map<std::string, std::string>> fetchLogsFromDatabase(int limit,
         return logs;
     }
     
+
+    // TODO 
+    // MySQL注入问题
     // 构建SQL查询
     std::string sql = "SELECT level, message, DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i:%s') as timestamp FROM log_table";
     
@@ -81,6 +84,8 @@ int getTotalLogsCount() {
         return 0;
     }
     
+    // TODO
+    // MySQL注入问题
     // 执行COUNT查询
     if (mysql_query(conn, "SELECT COUNT(*) FROM log_table") != 0) {
         std::cerr << "Query failed: " << mysql_error(conn) << std::endl;

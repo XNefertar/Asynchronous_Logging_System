@@ -35,6 +35,8 @@ HttpResponse handleLogsApi(const HttpRequest& request, ClientSession& session) {
     // 从数据库中获取日志数据
     std::vector<std::map<std::string, std::string>> logs = fetchLogsFromDatabase(limit, offset, levelFilter);
     
+    // TODO
+    // 使用专业JSON库实现
     // 将日志数据转换为JSON格式
     std::string json = "[";
     for (size_t i = 0; i < logs.size(); ++i) {
@@ -91,6 +93,7 @@ void handleWebSocketMessage(int sockfd, const std::string& message, ClientSessio
 
     // 处理从客户端接收的 WebSocket 消息
     std::string response = "{\"status\": \"ok\", \"message\": \"Received: " + message + "\"}";
+    std::cout << "handleWebSocketMessage: " << message << std::endl;
     __log_file << "[INFO] 处理WebSocket消息: " << message << std::endl;
     auto frame = createWebSocketFrameWrapper(response);
     send(sockfd, frame.data(), frame.size(), 0);

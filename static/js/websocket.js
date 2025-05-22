@@ -3,9 +3,16 @@ let isConnected = false;
 const connectionStatusElement = document.getElementById('connection-status');
 
 function initWebSocket() {
+    console.log('Initializing WebSocket connection...');
+    console.log('Determining protocol based on current page:', window.location.protocol);
+    
     // 使用当前主机和端口，自动构建 WebSocket URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+
+    console.log('Selected protocol:', protocol);
+    console.log('Constructing WebSocket URL:', wsUrl);
     
     websocket = new WebSocket(wsUrl);
     
@@ -37,7 +44,10 @@ function initWebSocket() {
     };
     
     websocket.onerror = function(error) {
-        console.error('WebSocket 错误:', error);
+        console.error('WebSocket错误:', error);
+        console.log('WebSocket连接状态:', websocket.readyState);
+        connectionStatusElement.textContent = '连接错误';
+        connectionStatusElement.className = 'connection-status error';
     };
 }
 
@@ -106,3 +116,7 @@ function downloadLogFile(fileType) {
         document.body.removeChild(link);
     }, 100);
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    initWebSocket();
+});

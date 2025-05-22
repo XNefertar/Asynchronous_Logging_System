@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchStats();
     
     // 设置定时刷新统计数据
-    setInterval(fetchStats, 5000);
+    setInterval(fetchStats, 30000);   // 可以保留统计轮询但降低频率，或依赖WebSocket更新
     
     // 添加事件监听
     document.getElementById('refresh-logs').addEventListener('click', fetchLogs);
