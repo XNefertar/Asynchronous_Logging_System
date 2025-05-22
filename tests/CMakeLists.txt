@@ -68,28 +68,22 @@ set(COMMON_LIBRARIES
 # 单元测试 - 保留这些定义但删除EXCLUDE_MAIN行
 add_executable(EpollServer_test unit/EpollServer_test.cpp)
 target_link_libraries(EpollServer_test ${COMMON_LIBRARIES})
-# 删除这行: target_compile_definitions(EpollServer_test PRIVATE EXCLUDE_MAIN)
 
 add_executable(WebSocket_test unit/WebSocket_test.cpp)
 target_link_libraries(WebSocket_test ${COMMON_LIBRARIES})
-# 删除这行: target_compile_definitions(WebSocket_test PRIVATE EXCLUDE_MAIN)
 
 add_executable(SqlConnPool_test unit/SqlConnPool_test.cpp)
 target_link_libraries(SqlConnPool_test ${COMMON_LIBRARIES})
-# 删除这行: target_compile_definitions(SqlConnPool_test PRIVATE EXCLUDE_MAIN)
 
 add_executable(Client_test unit/Client_test.cpp)
 target_link_libraries(Client_test ${COMMON_LIBRARIES})
-# 删除这行: target_compile_definitions(Client_test PRIVATE EXCLUDE_MAIN)
 
 # 集成测试 - 同样处理
 add_executable(ServerClient_test integration/ServerClient_test.cpp)
 target_link_libraries(ServerClient_test ${COMMON_LIBRARIES})
-# 删除这行: target_compile_definitions(ServerClient_test PRIVATE EXCLUDE_MAIN)
 
 add_executable(WebSocketComm_test integration/WebSocketComm_test.cpp)
 target_link_libraries(WebSocketComm_test ${COMMON_LIBRARIES})
-# 删除这行: target_compile_definitions(WebSocketComm_test PRIVATE EXCLUDE_MAIN)
 
 add_executable(HighLoad_test performance/HighLoad_test.cpp)
 target_link_libraries(HighLoad_test ${PERFORMANCE_LIBRARIES})  # 使用包含benchmark的库列表

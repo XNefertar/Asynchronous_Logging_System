@@ -12,6 +12,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <thread>
+#include "AsyncLogBuffer.hpp"
 
 #define NORMAL 0
 #define INFO 1
@@ -24,12 +26,18 @@
 
 std::string to_log(LOG_LEVEL level);
 
-struct LogMessage
-{
+class LogMessage {
+private:
     static std::string default_log_path;
-    static void setDefaultLogPath(const std::string &path);
-    static void logMessage(LOG_LEVEL level, const char *message, ...);
-};
+    static std::unique_ptr<AsyncLogBuffer> logBuffer;
+    static std::once_flag initFlag;
+    
+    static void initializeBuffer();
 
+public:
+    static void logMessage(LOG_LEVEL level, const char *message, ...);
+    static void setDefaultLogPath(const std::string &path);
+    static void flush(); // 手动刷新日志
+};
 
 #endif // __LOG_MESSAGE_HPP__

@@ -24,6 +24,7 @@ add_executable(server
     Server/main.cpp
     Server/Server.cpp
     LogMessage/LogMessage.cpp
+    LogMessage/AsyncLogBuffer.cpp
     Util/SessionManager.cpp
     Util/LogTemplates.cpp
     MySQL/SqlConnPool.cpp
@@ -43,12 +44,14 @@ add_executable(webserver
     WebSocket/WebSocketApiHandlers.cpp
     Util/SessionManager.cpp
     LogMessage/LogMessage.cpp
+    LogMessage/AsyncLogBuffer.cpp
 )
 
 add_executable(client 
     Client/main.cpp
     Client/Client.cpp
     LogMessage/LogMessage.cpp
+    LogMessage/AsyncLogBuffer.cpp
 )
 
 add_executable(main 
