@@ -14,7 +14,7 @@
 #include <exception>
 #include <condition_variable>
 
-// 杈呭姪鍑芥暟锛屽皢鍗曚釜鍙傛暟杞崲涓哄瓧绗︿覆
+// 辅助函数，将单个参数转换为字符串
 template <typename T>
 std::string to_string(T value) {
     std::ostringstream os;
