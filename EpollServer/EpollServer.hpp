@@ -18,6 +18,10 @@
 #include <functional>
 #include <unordered_map>
 #include <sstream>
+#include <openssl/sha.h>  // 需要 OpenSSL 库
+#include <openssl/evp.h>
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
 #include "../Util/Sock.hpp"
 #include "../MySQL/SqlConnPool.hpp"
 #include "../Util/SessionManager.hpp"

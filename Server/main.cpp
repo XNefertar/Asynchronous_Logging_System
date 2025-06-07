@@ -37,7 +37,7 @@ std::string securePasswordInput(const std::string& prompt) {
 
 int main(int argc, char* argv[])
 {
-    // 
+    
     if (argc != 2)
     {
         Usage(argv[0]);

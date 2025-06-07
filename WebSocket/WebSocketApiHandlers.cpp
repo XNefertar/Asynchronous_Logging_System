@@ -11,15 +11,15 @@
 std::string __log_file_path = std::filesystem::current_path().string() + "/Log/WebSocketServer.txt";
 std::ofstream __log_file(__log_file_path, std::ios::app);
 
-// å¤„ç†æ—¥å¿—APIè¯·æ±‚
+// ´¦ÀíÈÕÖ¾APIÇëÇó
 HttpResponse handleLogsApi(const HttpRequest& request, ClientSession& session) {
     HttpResponse response;
     response.statusCode = 200;
     response.statusText = "OK";
     
-    // æŸ¥è¯¢å‚æ•°è§£æ
-    int limit = 100;  // é»˜è®¤é™åˆ¶
-    int offset = 0;   // é»˜è®¤åç§»
+    // ²éÑ¯²ÎÊı½âÎö
+    int limit = 100;  // Ä¬ÈÏÏŞÖÆ
+    int offset = 0;   // Ä¬ÈÏÆ«ÒÆ
     std::string levelFilter;
     
     for (const auto& param : request.queryParams) {
@@ -32,12 +32,12 @@ HttpResponse handleLogsApi(const HttpRequest& request, ClientSession& session) {
         }
     }
     
-    // ä»æ•°æ®åº“ä¸­è·å–æ—¥å¿—æ•°æ®
+    // ´ÓÊı¾İ¿âÖĞ»ñÈ¡ÈÕÖ¾Êı¾İ
     std::vector<std::map<std::string, std::string>> logs = fetchLogsFromDatabase(limit, offset, levelFilter);
     
     // TODO
-    // ä½¿ç”¨ä¸“ä¸šJSONåº“å®ç°
-    // å°†æ—¥å¿—æ•°æ®è½¬æ¢ä¸ºJSONæ ¼å¼
+    // Ê¹ÓÃ×¨ÒµJSON¿âÊµÏÖ
+    // ½«ÈÕÖ¾Êı¾İ×ª»»ÎªJSON¸ñÊ½
     std::string json = "[";
     for (size_t i = 0; i < logs.size(); ++i) {
         json += "{\n";
@@ -59,19 +59,19 @@ HttpResponse handleLogsApi(const HttpRequest& request, ClientSession& session) {
     return response;
 }
 
-// å¤„ç†ç»Ÿè®¡APIè¯·æ±‚
+// ´¦ÀíÍ³¼ÆAPIÇëÇó
 HttpResponse handleStatsApi(const HttpRequest& request, ClientSession& session) {
     HttpResponse response;
     response.statusCode = 200;
     response.statusText = "OK";
     
-    // è·å–ç»Ÿè®¡ä¿¡æ¯
+    // »ñÈ¡Í³¼ÆĞÅÏ¢
     int totalLogs = getTotalLogsCount();
     int warningCount = getLogCountByLevel("WARNING");
     int errorCount = getLogCountByLevel("ERROR") + getLogCountByLevel("FATAL");
     int clientCount = SessionManager::getInstance()->getSessionCount();
     
-    // æ„å»ºJSONå“åº”
+    // ¹¹½¨JSONÏìÓ¦
     std::string json = "{\n";
     json += "\"totalLogs\": " + std::to_string(totalLogs) + ",\n";
     json += "\"warningCount\": " + std::to_string(warningCount) + ",\n";
@@ -86,22 +86,22 @@ HttpResponse handleStatsApi(const HttpRequest& request, ClientSession& session) 
     return response;
 }
 
-// WebSocketæ¶ˆæ¯å¤„ç†å™¨
+// WebSocketÏûÏ¢´¦ÀíÆ÷
 void handleWebSocketMessage(int sockfd, const std::string& message, ClientSession& session) {
-    // è°ƒç”¨æ•°æ®åº“æ’å…¥å‡½æ•°
+    // µ÷ÓÃÊı¾İ¿â²åÈëº¯Êı
     insertWebSocketMessage(sockfd, message, session);
 
-    // å¤„ç†ä»å®¢æˆ·ç«¯æ¥æ”¶çš„ WebSocket æ¶ˆæ¯
+    // ´¦Àí´Ó¿Í»§¶Ë½ÓÊÕµÄ WebSocket ÏûÏ¢
     std::string response = "{\"status\": \"ok\", \"message\": \"Received: " + message + "\"}";
     std::cout << "handleWebSocketMessage: " << message << std::endl;
-    __log_file << "[INFO] å¤„ç†WebSocketæ¶ˆæ¯: " << message << std::endl;
+    __log_file << "[INFO] ´¦ÀíWebSocketÏûÏ¢: " << message << std::endl;
     auto frame = createWebSocketFrameWrapper(response);
     send(sockfd, frame.data(), frame.size(), 0);
 }
 
-// å‘é€æ—¥å¿—æ›´æ–°åˆ°æ‰€æœ‰ WebSocket å®¢æˆ·ç«¯
+// ·¢ËÍÈÕÖ¾¸üĞÂµ½ËùÓĞ WebSocket ¿Í»§¶Ë
 void broadcastLogUpdate(const std::string& level, const std::string& message) {
-    // æ„é€ æ—¥å¿— JSON
+    // ¹¹ÔìÈÕÖ¾ JSON
     auto now = std::chrono::system_clock::now();
     std::time_t now_time = std::chrono::system_clock::to_time_t(now);
     char time_buffer[100];
@@ -113,82 +113,82 @@ void broadcastLogUpdate(const std::string& level, const std::string& message) {
     logJson += "\"message\": \"" + message + "\"\n";
     logJson += "}";
     
-    // å¹¿æ’­åˆ°æ‰€æœ‰ WebSocket å®¢æˆ·ç«¯
+    // ¹ã²¥µ½ËùÓĞ WebSocket ¿Í»§¶Ë
     broadcastWebSocketMessageWrapper(logJson);
 }
 
-// å¤„ç†WebSocketæ¶ˆæ¯å¹¶æ’å…¥æ•°æ®åº“
+// ´¦ÀíWebSocketÏûÏ¢²¢²åÈëÊı¾İ¿â
 void insertWebSocketMessage(int sockfd, const std::string& message, ClientSession& session) {
-    // å°è¯•è§£æJSONæ ¼å¼çš„æ—¥å¿—æ¶ˆæ¯
+    // ³¢ÊÔ½âÎöJSON¸ñÊ½µÄÈÕÖ¾ÏûÏ¢
     try {
-        // ç®€å•çš„JSONè§£æï¼ˆå®é™…é¡¹ç›®ä¸­å¯èƒ½éœ€è¦ä½¿ç”¨JSONåº“ï¼‰
+        // ¼òµ¥µÄJSON½âÎö(Êµ¼ÊÏîÄ¿ÖĞ¿ÉÄÜĞèÒªÊ¹ÓÃJSON¿â)
         std::string level, logMessage, timestamp;
         
-        // æå–levelå­—æ®µ
+        // ÌáÈ¡level×Ö¶Î
         size_t levelPos = message.find("\"level\":");
         if (levelPos != std::string::npos) {
             size_t valueStart = message.find("\"", levelPos + 8) + 1;
             size_t valueEnd = message.find("\"", valueStart);
             level = message.substr(valueStart, valueEnd - valueStart);
         }
-        __log_file << "[INFO] è§£æåˆ°æ—¥å¿—çº§åˆ«: " << level << std::endl;
+        __log_file << "[INFO] ½âÎöµ½ÈÕÖ¾¼¶±ğ: " << level << std::endl;
         
-        // æå–messageå­—æ®µ
+        // ÌáÈ¡message×Ö¶Î
         size_t messagePos = message.find("\"message\":");
         if (messagePos != std::string::npos) {
             size_t valueStart = message.find("\"", messagePos + 10) + 1;
             size_t valueEnd = message.find("\"", valueStart);
             logMessage = message.substr(valueStart, valueEnd - valueStart);
         }
-        __log_file << "[INFO] è§£æåˆ°æ—¥å¿—æ¶ˆæ¯: " << logMessage << std::endl;
+        __log_file << "[INFO] ½âÎöµ½ÈÕÖ¾ÏûÏ¢: " << logMessage << std::endl;
         
-        // æå–timestampå­—æ®µ
+        // ÌáÈ¡timestamp×Ö¶Î
         size_t timestampPos = message.find("\"timestamp\":");
         if (timestampPos != std::string::npos) {
             size_t valueStart = message.find("\"", timestampPos + 12) + 1;
             size_t valueEnd = message.find("\"", valueStart);
             timestamp = message.substr(valueStart, valueEnd - valueStart);
         }
-        __log_file << "[INFO] è§£æåˆ°æ—¶é—´æˆ³: " << timestamp << std::endl;
+        __log_file << "[INFO] ½âÎöµ½Ê±¼ä´Á: " << timestamp << std::endl;
         
-        // è·å–æ•°æ®åº“è¿æ¥å¹¶æ’å…¥æ—¥å¿—
+        // »ñÈ¡Êı¾İ¿âÁ¬½Ó²¢²åÈëÈÕÖ¾
         MYSQL* conn = nullptr;
         SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
         
         if (conn) {
-            // å‡†å¤‡SQLè¯­å¥
+            // ×¼±¸SQLÓï¾ä
             std::string sql = "INSERT INTO log_table (level, message, timestamp) VALUES (?, ?, ?)";
             
-            // ä½¿ç”¨é¢„å¤„ç†è¯­å¥é˜²æ­¢SQLæ³¨å…¥
+            // Ê¹ÓÃÔ¤´¦ÀíÓï¾ä·ÀÖ¹SQL×¢Èë
             MYSQL_STMT* stmt = mysql_stmt_init(conn);
             if (stmt) {
                 if (mysql_stmt_prepare(stmt, sql.c_str(), sql.length()) == 0) {
                     MYSQL_BIND bind[3];
                     memset(bind, 0, sizeof(bind));
                     
-                    // ç»‘å®šlevelå‚æ•°
+                    // °ó¶¨level²ÎÊı
                     bind[0].buffer_type = MYSQL_TYPE_STRING;
                     bind[0].buffer = (void*)level.c_str();
                     bind[0].buffer_length = level.length();
                     
-                    // ç»‘å®šmessageå‚æ•°
+                    // °ó¶¨message²ÎÊı
                     bind[1].buffer_type = MYSQL_TYPE_STRING;
                     bind[1].buffer = (void*)logMessage.c_str();
                     bind[1].buffer_length = logMessage.length();
                     
-                    // ç»‘å®štimestampå‚æ•°
+                    // °ó¶¨timestamp²ÎÊı
                     bind[2].buffer_type = MYSQL_TYPE_STRING;
                     bind[2].buffer = (void*)timestamp.c_str();
                     bind[2].buffer_length = timestamp.length();
                     
                     if (mysql_stmt_bind_param(stmt, bind) == 0) {
                         if (mysql_stmt_execute(stmt) == 0) {
-                            // æˆåŠŸæ’å…¥æ•°æ®åº“
+                            // ³É¹¦²åÈëÊı¾İ¿â
                             std::string response = "{\"status\": \"ok\", \"message\": \"Log saved to database\"}";
                             auto frame = createWebSocketFrameWrapper(response);
                             send(sockfd, frame.data(), frame.size(), 0);
                         } else {
-                            // æ‰§è¡Œå¤±è´¥
+                            // Ö´ĞĞÊ§°Ü
                             std::string error = mysql_stmt_error(stmt);
                             std::string response = "{\"status\": \"error\", \"message\": \"Database error: " + error + "\"}";
                             auto frame = createWebSocketFrameWrapper(response);
@@ -196,19 +196,19 @@ void insertWebSocketMessage(int sockfd, const std::string& message, ClientSessio
                         }
                     }   
 
-                    __log_file << "[INFO] ç»‘å®šå‚æ•°æˆåŠŸ" << std::endl;
+                    __log_file << "[INFO] °ó¶¨²ÎÊı³É¹¦" << std::endl;
                     
                     mysql_stmt_close(stmt);
                 }
             }
         } else {
-            // æ— æ³•è·å–æ•°æ®åº“è¿æ¥
+            // ÎŞ·¨»ñÈ¡Êı¾İ¿âÁ¬½Ó
             std::string response = "{\"status\": \"error\", \"message\": \"Database connection failed\"}";
             auto frame = createWebSocketFrameWrapper(response);
             send(sockfd, frame.data(), frame.size(), 0);
         }
     } catch (const std::exception& e) {
-        // å¤„ç†å¼‚å¸¸
+        // ´¦ÀíÒì³£
         std::string response = "{\"status\": \"error\", \"message\": \"Error processing log: " + std::string(e.what()) + "\"}";
         auto frame = createWebSocketFrameWrapper(response);
         send(sockfd, frame.data(), frame.size(), 0);
@@ -218,15 +218,15 @@ void insertWebSocketMessage(int sockfd, const std::string& message, ClientSessio
 HttpResponse handleLogFileDownload(const HttpRequest& request, ClientSession& session) {
     HttpResponse response;
     
-    // è·å–æŸ¥è¯¢å‚æ•°ä¸­æŒ‡å®šçš„æ–‡ä»¶ç±»å‹
-    std::string fileType = "html"; // é»˜è®¤html
+    // »ñÈ¡²éÑ¯²ÎÊıÖĞÖ¸¶¨µÄÎÄ¼şÀàĞÍ
+    std::string fileType = "html"; // Ä¬ÈÏhtml
     if (request.queryParams.find("type") != request.queryParams.end()) {
         fileType = request.queryParams.at("type");
     }
     
     std::string filePath = std::filesystem::current_path().string() + "/log." + fileType;
     
-    // æ£€æŸ¥æ–‡ä»¶æ˜¯å¦å­˜åœ¨
+    // ¼ì²éÎÄ¼şÊÇ·ñ´æÔÚ
     if (!std::filesystem::exists(filePath)) {
         response.statusCode = 404;
         response.statusText = "Not Found";
@@ -234,13 +234,13 @@ HttpResponse handleLogFileDownload(const HttpRequest& request, ClientSession& se
         return response;
     }
     
-    // è¯»å–æ–‡ä»¶å†…å®¹
+    // ¶ÁÈ¡ÎÄ¼şÄÚÈİ
     std::ifstream file(filePath, std::ios::binary);
     std::ostringstream contentStream;
     contentStream << file.rdbuf();
     response.body = contentStream.str();
     
-    // è®¾ç½®å“åº”å¤´
+    // ÉèÖÃÏìÓ¦Í·
     response.statusCode = 200;
     response.statusText = "OK";
     response.headers["Content-Type"] = (fileType == "html") ? "text/html" : "text/plain";

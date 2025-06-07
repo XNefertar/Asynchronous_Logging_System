@@ -1,14 +1,15 @@
 #include "EpollServer.hpp"
-#include <openssl/sha.h>  // 需要 OpenSSL 库
-#include <openssl/evp.h>
-#include <openssl/bio.h>
-#include <openssl/buffer.h>
+
 
 using namespace EpollServerSpace;
 
+namespace Server{
+    EpollServerSpace::EpollServer* g_server = nullptr; // 全局服务器实例
+}
+
 void EpollServerSpace::signalHandler(int signum)
 {
-    std::cout << "\033[1;31m[错误]\033[0m 捕获到信号 " << signum << "，服务器正在关闭..." << std::endl;
+    std::cout << "\033[1;31m[错误]\033[0m 捕获到信号 " << signum << ", 服务器正在关闭..." << std::endl;
     exit(0);
 }
 
@@ -99,7 +100,7 @@ void EpollServer::ServerInit(){
 }
 
 void EpollServer::ServerStart(){
-    std::cout << "\033[1;34m[运行]\033[0m 服务器开始运行，等待连接..." << std::endl;
+    std::cout << "\033[1;34m[运行]\033[0m 服务器开始运行, 等待连接..." << std::endl;
     for(;;){
         int ReadyNum = epoll_wait(_epollfd, _events, defaultEpollSize, timeout);
         switch(ReadyNum){
@@ -107,7 +108,7 @@ void EpollServer::ServerStart(){
                 std::cerr << "\033[1;31m[错误]\033[0m epoll_wait 失败: " << strerror(errno) << std::endl;
                 break;
             case 0:
-                // timeout, 正常情况，什么都不做
+                // timeout, 正常情况, 什么都不做
                 break;
             default:
                 HandleEvents(ReadyNum);
@@ -190,6 +191,8 @@ void EpollServer::HandleEvents(int ReadyNum) {
                 _log_file << "[INFO] Client disconnected, socket: " << sockfd << std::endl;
                 continue;
             }
+
+            buffer[n] = '\0'; // 确保字符串结束
             
             // 获取会话信息
             ClientSessionInfo sessionInfo = SessionManager::getInstance()->getSession(sockfd);
@@ -244,8 +247,16 @@ void EpollServer::HandleEvents(int ReadyNum) {
                     std::vector<char> frameData(buffer, buffer + n);
                     handleWebSocketFrame(sockfd, frameData, session);
                 } else {
-                    // 普通TCP数据，这里可以处理您原有的协议
-                    // ...
+                    // 普通TCP数据处理
+                    // TODO
+                    // 这里是Client发送的日志数据, 交给Server::socketIO处理
+                    _log_file << "[INFO] Processing TCP log data from client" << std::endl;
+                    
+                    // 设置全局服务器引用以便WebSocket广播
+                    Server::g_server = this;
+                    
+                    // 调用Server的socketIO来处理日志数据和数据库写入
+                    
                 }
             }
         }
@@ -365,7 +376,7 @@ HttpResponse EpollServer::serveStaticFile(const std::string& path) {
     // 拼接完整文件路径
     std::string fullPath = _staticFilesDir + path;
     
-    // 如果路径是目录，则尝试提供 index.html
+    // 如果路径是目录, 则尝试提供 index.html
     if (fullPath.back() == '/') {
         fullPath += "index.html";
     }
@@ -394,7 +405,7 @@ HttpResponse EpollServer::serveStaticFile(const std::string& path) {
     return response;
 }
 
-// Base64 编码，用于WebSocket握手
+// Base64 编码, 用于WebSocket握手
 std::string base64Encode(const unsigned char* input, int length) {
     BIO* bio, *b64;
     BUF_MEM* bufferPtr;
@@ -464,21 +475,21 @@ std::vector<char> EpollServer::createWebSocketFrame(const std::string& message, 
     std::vector<char> frame;
     
     // 帧头第一个字节 (FIN + opcode)
-    frame.push_back(0x80 | static_cast<char>(opcode));  // FIN 位设为 1，表示这是最后一个帧
+    frame.push_back(0x80 | static_cast<char>(opcode));  // FIN 位设为 1, 表示这是最后一个帧
     
     // 帧头第二个字节起 (mask + payload length)
     size_t payloadLength = message.size();
     
     if (payloadLength < 126) {
-        // 如果负载长度小于 126，直接在第二个字节表示长度
+        // 如果负载长度小于 126, 直接在第二个字节表示长度
         frame.push_back(static_cast<char>(payloadLength));
     } else if (payloadLength <= 0xFFFF) {
-        // 如果负载长度在 126 到 65535 之间，使用 2 字节表示长度
+        // 如果负载长度在 126 到 65535 之间, 使用 2 字节表示长度
         frame.push_back(126);
         frame.push_back((payloadLength >> 8) & 0xFF);
         frame.push_back(payloadLength & 0xFF);
     } else {
-        // 如果负载长度大于 65535，使用 8 字节表示长度
+        // 如果负载长度大于 65535, 使用 8 字节表示长度
         frame.push_back(127);
         for (int i = 7; i >= 0; --i) {
             frame.push_back((payloadLength >> (i * 8)) & 0xFF);
@@ -568,7 +579,7 @@ void EpollServer::handleWebSocketFrame(int sockfd, const std::vector<char>& fram
     // 根据 opcode 处理不同类型的帧
     switch (static_cast<WebSocketOpcode>(opcode)) {
         case WebSocketOpcode::TEXT:
-            // 处理文本消息，调用 WebSocket 处理器
+            // 处理文本消息, 调用 WebSocket 处理器
             if (_wsHandler) {
                 _wsHandler(sockfd, payload, session);
             }
@@ -652,7 +663,7 @@ void EpollServer::handleHttpRequest(int sockfd, const HttpRequest& request, Clie
             break;
     }
     
-    // 如果没有处理，则尝试提供静态文件
+    // 如果没有处理, 则尝试提供静态文件
     if (!handled) {
         response = serveStaticFile(request.path);
     }
