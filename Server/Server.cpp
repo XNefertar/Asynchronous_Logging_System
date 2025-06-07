@@ -1,5 +1,6 @@
 #include "Server.hpp"
-using namespace Server;
+#include "AsyncDBWriter.hpp"
+using namespace AsyncDBWriterSpace;
 
 int Server::LeveltoInt(const std::string& level) {
     if (level == "NORMAL") return NORMAL;
@@ -9,6 +10,24 @@ int Server::LeveltoInt(const std::string& level) {
     if (level == "ERROR") return ERROR;
     if (level == "FATAL") return FATAL;
     return -1; // 未知等级
+}
+
+void Server::broadcastLogToWebSocket(const std::string& level, const std::string& message, const std::string& timestamp) {
+    // 构造JSON格式的日志数据
+    std::string logJson = "{\n";
+    logJson += "\"type\": \"log_update\",\n";
+    logJson += "\"timestamp\": \"" + timestamp + "\",\n";
+    logJson += "\"level\": \"" + level + "\",\n";
+    logJson += "\"message\": \"" + message + "\"\n";
+    logJson += "}";
+    
+    // 调用全局WebSocket广播函数
+    if (g_server) {
+        g_server->broadcastWebSocketMessage(logJson);
+        LogMessage::logMessage(INFO, "WebSocket广播日志: %s - %s", level.c_str(), message.c_str());
+    } else {
+        LogMessage::logMessage(WARNING, "WebSocket服务器未初始化，无法广播日志");
+    }
 }
 
 void Server::socketIO(int socket){
@@ -121,70 +140,75 @@ void Server::socketIO(int socket){
                 // TODO: message字段需要更新
 
                 
-                MYSQL* conn = nullptr;
-                SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
+                // MYSQL* conn = nullptr;
+                // SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
 
 
-                if(conn){
-                    // 1. 初始化预处理语句
-                    MYSQL_STMT *stmt = mysql_stmt_init(conn);
-                    if (!stmt) {
-                        LogMessage::logMessage(ERROR, "mysql_stmt_init() 失败: %s", mysql_error(conn));
-                        continue;
-                    }
+                // if(conn){
+                //     // 1. 初始化预处理语句
+                //     MYSQL_STMT *stmt = mysql_stmt_init(conn);
+                //     if (!stmt) {
+                //         LogMessage::logMessage(ERROR, "mysql_stmt_init() 失败: %s", mysql_error(conn));
+                //         continue;
+                //     }
                     
-                    // 2. 准备带有占位符的SQL语句
-                    const char *query = "INSERT INTO log_table (level, ip, port, message) VALUES (?, ?, ?, ?)";
-                    if (mysql_stmt_prepare(stmt, query, strlen(query))) {
-                        LogMessage::logMessage(ERROR, "mysql_stmt_prepare() 失败: %s", mysql_stmt_error(stmt));
-                        mysql_stmt_close(stmt);
-                        continue;
-                    }
+                //     // 2. 准备带有占位符的SQL语句
+                //     const char *query = "INSERT INTO log_table (level, ip, port, message) VALUES (?, ?, ?, ?)";
+                //     if (mysql_stmt_prepare(stmt, query, strlen(query))) {
+                //         LogMessage::logMessage(ERROR, "mysql_stmt_prepare() 失败: %s", mysql_stmt_error(stmt));
+                //         mysql_stmt_close(stmt);
+                //         continue;
+                //     }
                     
-                    // 3. 绑定参数
-                    MYSQL_BIND bind[4];
-                    memset(bind, 0, sizeof(bind));
+                //     // 3. 绑定参数
+                //     MYSQL_BIND bind[4];
+                //     memset(bind, 0, sizeof(bind));
                     
-                    // level 参数
-                    bind[0].buffer_type = MYSQL_TYPE_STRING;
-                    bind[0].buffer = (void*)logLevel.c_str();
-                    bind[0].buffer_length = logLevel.length();
+                //     // level 参数
+                //     bind[0].buffer_type = MYSQL_TYPE_STRING;
+                //     bind[0].buffer = (void*)logLevel.c_str();
+                //     bind[0].buffer_length = logLevel.length();
                     
-                    // ip 参数
-                    bind[1].buffer_type = MYSQL_TYPE_STRING;
-                    bind[1].buffer = (void*)client_ip.c_str();
-                    bind[1].buffer_length = client_ip.length();
+                //     // ip 参数
+                //     bind[1].buffer_type = MYSQL_TYPE_STRING;
+                //     bind[1].buffer = (void*)client_ip.c_str();
+                //     bind[1].buffer_length = client_ip.length();
                     
-                    // port 参数
-                    unsigned int port = client_port;
-                    bind[2].buffer_type = MYSQL_TYPE_LONG;
-                    bind[2].buffer = (void*)&port;
+                //     // port 参数
+                //     unsigned int port = client_port;
+                //     bind[2].buffer_type = MYSQL_TYPE_LONG;
+                //     bind[2].buffer = (void*)&port;
                     
-                    // message 参数
-                    bind[3].buffer_type = MYSQL_TYPE_STRING;
-                    bind[3].buffer = (void*)message.c_str();
-                    bind[3].buffer_length = message.length();
+                //     // message 参数
+                //     bind[3].buffer_type = MYSQL_TYPE_STRING;
+                //     bind[3].buffer = (void*)message.c_str();
+                //     bind[3].buffer_length = message.length();
                     
-                    // 4. 绑定参数到预处理语句
-                    if (mysql_stmt_bind_param(stmt, bind)) {
-                        LogMessage::logMessage(ERROR, "mysql_stmt_bind_param() 失败: %s", mysql_stmt_error(stmt));
-                        mysql_stmt_close(stmt);
-                        continue;
-                    }
+                //     // 4. 绑定参数到预处理语句
+                //     if (mysql_stmt_bind_param(stmt, bind)) {
+                //         LogMessage::logMessage(ERROR, "mysql_stmt_bind_param() 失败: %s", mysql_stmt_error(stmt));
+                //         mysql_stmt_close(stmt);
+                //         continue;
+                //     }
                     
-                    // 5. 执行预处理语句
-                    if (mysql_stmt_execute(stmt)) {
-                        LogMessage::logMessage(ERROR, "mysql_stmt_execute() 失败: %s", mysql_stmt_error(stmt));
-                        mysql_stmt_close(stmt);
-                        continue;
-                    }
+                //     // 5. 执行预处理语句
+                //     if (mysql_stmt_execute(stmt)) {
+                //         LogMessage::logMessage(ERROR, "mysql_stmt_execute() 失败: %s", mysql_stmt_error(stmt));
+                //         mysql_stmt_close(stmt);
+                //         continue;
+                //     }
                     
-                    LogMessage::logMessage(INFO, "MySQL 成功插入日志: level=%s, ip=%s, port=%u", 
-                                          logLevel.c_str(), client_ip.c_str(), port);
+                //     LogMessage::logMessage(INFO, "MySQL 成功插入日志: level=%s, ip=%s, port=%u", 
+                //                           logLevel.c_str(), client_ip.c_str(), port);
                     
-                    // 6. 关闭预处理语句
-                    mysql_stmt_close(stmt);
-                }
+                //     // 6. 关闭预处理语句
+                //     mysql_stmt_close(stmt);
+                // }
+                DBWriteTask task(logLevel, client_ip, client_port, message);
+                AsyncDBWriter::getInstance().addTask(task);
+                std::cout << "\033[1;32m[数据库记录]\033[0m 日志已提交到异步写入队列" << std::endl;
+
+                broadcastLogToWebSocket(logLevel, message, timestamp);
             }
         }
         else{
@@ -217,15 +241,21 @@ Server::ServerTCP::ServerTCP(uint64_t    port
             if(0 == _port) 
                 _port = defaultPort;
 
-
             // 初始化数据库连接池
             if(!SqlConnPool::getInstance()->init(_defaultIPAddress.c_str(), _defaultUserName.c_str(), _defaultPassword.c_str(), _defaultDBName.c_str(), _defaultPort, _defaultMaxConn)){
                 std::cerr << "\033[1;31m[错误]\033[0m 数据库连接池初始化失败" << std::endl;
                 exit(1);
             }
+            
+            // 启动异步数据库写入器
+            AsyncDBWriter::getInstance().start(2); // 启动2个工作线程
         }
 
-Server::ServerTCP::~ServerTCP() { close(_socketfd); }
+// 修改析构函数，确保正确关闭异步写入器
+Server::ServerTCP::~ServerTCP() {
+    AsyncDBWriter::getInstance().shutdown();
+    close(_socketfd);
+}
 
 void Server::ServerTCP::init(){
     _socketfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -284,4 +314,8 @@ void Server::ServerTCP::run(){
         std::thread client_thread(socketIO, client_socket);
         client_thread.detach(); // 分离线程，允许其独立运行
     }
+}
+
+void Server::setGlobalServerReference(EpollServerSpace::EpollServer* server) {
+    g_server = server;
 }

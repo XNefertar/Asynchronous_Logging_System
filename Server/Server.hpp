@@ -18,18 +18,27 @@
 #include <ctime>
 #include "../MySQL/SqlConnPool.hpp"
 #include "../Logger.hpp"
+#include "../EpollServer/EpollServer.hpp"
 #include "../LogMessage/LogMessage.hpp"
+
+namespace EpollServerSpace{
+    class EpollServer;
+}
 
 // 客户端从本地文件读取日志信息后传到远端服务器
 // 服务器接收日志信息并返回确认信息给客户端
 // 目前只支持单个客户端连接
 namespace Server{
-
+    extern EpollServerSpace::EpollServer* g_server; // 声明外部全局服务器变量
     // initialize socket
     // bind socket
     // listen socket
     void socketIO(int socket);
     int LeveltoInt(const std::string& level);
+
+    void broadcastLogToWebSocket(const std::string& level, const std::string& message, const std::string& timestamp);
+    void setGlobalServerReference(EpollServerSpace::EpollServer* server);
+    
     class ServerTCP{
     private:
         int         _socketfd;
