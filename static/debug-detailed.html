@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Detailed Debug Tool</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .panel { border: 2px solid #333; padding: 15px; margin: 10px 0; }
+        .result { padding: 5px; margin: 2px 0; }
+        .ok { color: green; }
+        .warn { color: orange; }
+        .fail { color: red; }
+        button { padding: 8px; margin: 3px; }
+        .log-test { background: #f5f5f5; padding: 10px; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h2>Detailed WebSocket & Function Debug</h2>
+        
+        <button onclick="testDOMElements()">Test DOM Elements</button>
+        <button onclick="testFunctionDependencies()">Test Function Dependencies</button>
+        <button onclick="simulateLogMessage()">Simulate Log Message</button>
+        <button onclick="checkWebSocketMessages()">Monitor WebSocket</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script src="js/websocket.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        function testDOMElements() {
+            log('=== DOM Elements Test ===');
+            
+            const elements = [
+                'log-container',
+                'logs', 
+                'total-logs',
+                'error-count',
+                'warning-count',
+                'info-count',
+                'level-filter'
+            ];
+            
+            elements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    log(`[OK] Found element: ${id}`, 'ok');
+                } else {
+                    log(`[FAIL] Missing element: ${id}`, 'fail');
+                    
+                    // 尝试通过class查找
+                    const byClass = document.querySelector(`.${id}`);
+                    if (byClass) {
+                        log(`[INFO] Found by class: .${id}`, 'warn');
+                    }
+                }
+            });
+        }
+
+        function testFunctionDependencies() {
+            log('=== Function Dependencies Test ===');
+            
+            // Test getLogType
+            if (typeof getLogType === 'function') {
+                try {
+                    const result = getLogType('ERROR');
+                    log(`[OK] getLogType('ERROR') = ${result}`, 'ok');
+                } catch (e) {
+                    log(`[FAIL] getLogType error: ${e.message}`, 'fail');
+                }
+            } else {
+                log('[FAIL] getLogType function missing', 'fail');
+            }
+            
+            // Test updateStatCounter with mock element
+            if (typeof updateStatCounter === 'function') {
+                try {
+                    updateStatCounter('INFO');
+                    log('[OK] updateStatCounter executed without error', 'ok');
+                } catch (e) {
+                    log(`[FAIL] updateStatCounter error: ${e.message}`, 'fail');
+                }
+            }
+        }
+
+        function simulateLogMessage() {
+            log('=== Simulating WebSocket Log Message ===');
+            
+            const testLog = {
+                type: 'log_update',
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                message: 'Test error message from debug tool'
+            };
+            
+            log(`Simulating log: ${JSON.stringify(testLog)}`);
+            
+            // 模拟WebSocket消息处理
+            try {
+                if (typeof addLogEntry === 'function') {
+                    addLogEntry(testLog);
+                    log('[OK] addLogEntry executed', 'ok');
+                }
+                
+                if (typeof updateStatCounter === 'function') {
+                    updateStatCounter(testLog.level);
+                    log('[OK] updateStatCounter executed', 'ok');
+                }
+            } catch (e) {
+                log(`[FAIL] Simulation error: ${e.message}`, 'fail');
+            }
+        }
+
+        function checkWebSocketMessages() {
+            log('=== WebSocket Message Monitoring ===');
+            
+            if (typeof websocket !== 'undefined' && websocket.readyState === 1) {
+                // 劫持WebSocket的onmessage
+                const originalOnMessage = websocket.onmessage;
+                
+                websocket.onmessage = function(event) {
+                    log(`[WS] Received: ${event.data.substring(0, 100)}...`);
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`[WS] Parsed type: ${data.type || 'unknown'}`);
+                    } catch (e) {
+                        log(`[WS] Parse error: ${e.message}`, 'warn');
+                    }
+                    
+                    // 调用原始处理函数
+                    if (originalOnMessage) {
+                        originalOnMessage.call(this, event);
+                    }
+                };
+                
+                log('[OK] WebSocket message monitoring enabled', 'ok');
+            } else {
+                log('[FAIL] WebSocket not available', 'fail');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Debug tool ready');
+            setTimeout(() => {
+                testDOMElements();
+                testFunctionDependencies();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

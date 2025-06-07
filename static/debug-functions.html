@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Function Override Detection Tool</title>
+    <style>
+        .debug-panel { margin: 20px; padding: 20px; border: 1px solid #ccc; }
+        .test-result { padding: 10px; margin: 5px 0; }
+        .success { background: #d4edda; color: #155724; }
+        .warning { background: #fff3cd; color: #856404; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="debug-panel">
+        <h2>Function Override Detection Tool</h2>
+        
+        <button onclick="runAllTests()">Run All Tests</button>
+        <button onclick="testWebSocketFunctions()">Test WebSocket Functions</button>
+        <button onclick="testLogFunctions()">Test Log Functions</button>
+        
+        <div id="test-results"></div>
+    </div>
+
+    <script src="js/websocket.js"></script>
+    <script>
+        function addTestResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            resultsDiv.appendChild(div);
+        }
+
+        function testWebSocketFunctions() {
+            addTestResult('Starting WebSocket function tests...', 'info');
+            
+            // Test WebSocket variable
+            if (typeof websocket !== 'undefined') {
+                addTestResult('✅ websocket variable exists', 'success');
+                addTestResult(`WebSocket state: ${websocket.readyState}`, 'info');
+                
+                // WebSocket state mapping
+                const states = {
+                    0: 'CONNECTING',
+                    1: 'OPEN',
+                    2: 'CLOSING',
+                    3: 'CLOSED'
+                };
+                addTestResult(`WebSocket status: ${states[websocket.readyState] || 'UNKNOWN'}`, 'info');
+            } else {
+                addTestResult('❌ websocket variable does not exist', 'error');
+            }
+            
+            // Test initWebSocket function
+            if (typeof initWebSocket === 'function') {
+                addTestResult('✅ initWebSocket function exists', 'success');
+            } else {
+                addTestResult('❌ initWebSocket function does not exist', 'error');
+            }
+            
+            // Test global variables
+            if (typeof isConnected !== 'undefined') {
+                addTestResult(`✅ isConnected variable exists: ${isConnected}`, 'success');
+            } else {
+                addTestResult('❌ isConnected variable does not exist', 'error');
+            }
+        }
+
+        function testLogFunctions() {
+            addTestResult('Starting log function tests...', 'info');
+            
+            const logFunctions = [
+                'addLogEntry',
+                'updateStatCounter',
+                'downloadLogFile',
+                'filterLogs',
+                'getLogType'
+            ];
+            
+            logFunctions.forEach(funcName => {
+                if (typeof window[funcName] === 'function') {
+                    addTestResult(`✅ ${funcName} function exists`, 'success');
+                    
+                    // Test function call
+                    try {
+                        if (funcName === 'addLogEntry') {
+                            // Test addLogEntry
+                            const testLog = {
+                                timestamp: new Date().toISOString(),
+                                level: 'DEBUG',
+                                message: 'Test log entry from debug tool'
+                            };
+                            window[funcName](testLog);
+                            addTestResult(`✅ ${funcName} called successfully`, 'success');
+                        } else if (funcName === 'updateStatCounter') {
+                            // Test updateStatCounter
+                            window[funcName]('INFO');
+                            addTestResult(`✅ ${funcName} called successfully`, 'success');
+                        }
+                    } catch (error) {
+                        addTestResult(`⚠️ ${funcName} call error: ${error.message}`, 'warning');
+                    }
+                } else {
+                    addTestResult(`❌ ${funcName} function does not exist`, 'error');
+                }
+            });
+        }
+
+        function testWebSocketConnection() {
+            addTestResult('Testing WebSocket connection...', 'info');
+            
+            if (typeof websocket !== 'undefined' && websocket.readyState === WebSocket.OPEN) {
+                // Send test message
+                const testMessage = JSON.stringify({
+                    type: 'test',
+                    timestamp: new Date().toISOString(),
+                    message: 'Test message from debug tool'
+                });
+                
+                try {
+                    websocket.send(testMessage);
+                    addTestResult('✅ Test message sent successfully', 'success');
+                } catch (error) {
+                    addTestResult(`❌ Failed to send test message: ${error.message}`, 'error');
+                }
+            } else {
+                addTestResult('❌ WebSocket is not connected', 'error');
+            }
+        }
+
+        function runAllTests() {
+            document.getElementById('test-results').innerHTML = '';
+            addTestResult('Starting all tests...', 'info');
+            
+            testWebSocketFunctions();
+            testLogFunctions();
+            testWebSocketConnection();
+            
+            addTestResult('All tests completed', 'info');
+        }
+
+        // Add detailed console monitoring
+        function setupConsoleMonitoring() {
+            const originalLog = console.log;
+            const originalError = console.error;
+            const originalWarn = console.warn;
+            
+            console.log = function(...args) {
+                originalLog.apply(console, args);
+                addTestResult(`[LOG] ${args.join(' ')}`, 'info');
+            };
+            
+            console.error = function(...args) {
+                originalError.apply(console, args);
+                addTestResult(`[ERROR] ${args.join(' ')}`, 'error');
+            };
+            
+            console.warn = function(...args) {
+                originalWarn.apply(console, args);
+                addTestResult(`[WARN] ${args.join(' ')}`, 'warning');
+            };
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            addTestResult('Debug tool loaded successfully', 'success');
+            
+            // Optional: Setup console monitoring
+            // setupConsoleMonitoring();
+            
+            // Auto-run tests after 1 second
+            setTimeout(() => {
+                runAllTests();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

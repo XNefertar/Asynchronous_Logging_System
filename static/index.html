@@ -24,11 +24,15 @@
                 </div>
                 <div class="stat-card">
                     <h3>警告数</h3>
-                    <div class="stat-value warning" id="warning-logs">0</div>
+                    <div class="stat-value warning" id="warning-count">0</div>
                 </div>
                 <div class="stat-card">
                     <h3>错误数</h3>
-                    <div class="stat-value error" id="error-logs">0</div>
+                    <div class="stat-value error" id="error-count">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>信息数</h3>
+                    <div class="stat-value info" id="info-count">0</div>
                 </div>
                 <div class="stat-card">
                     <h3>客户端连接数</h3>
@@ -42,44 +46,86 @@
             </div>
 
             <div class="filter-bar">
-                <input type="text" id="search-input" placeholder="搜索日志...">
-                <select id="level-filter">
-                    <option value="all">全部级别</option>
+                <input type="text" id="search-input" placeholder="搜索日志..." onkeyup="filterLogs()">
+                <select id="level-filter" onchange="filterLogs()">
+                    <option value="">全部级别</option>
                     <option value="INFO">INFO</option>
                     <option value="DEBUG">DEBUG</option>
                     <option value="WARNING">WARNING</option>
                     <option value="ERROR">ERROR</option>
                     <option value="FATAL">FATAL</option>
                 </select>
-                <select id="type-filter">
-                    <option value="all">全部类型</option>
+                <select id="type-filter" onchange="filterLogs()">
+                    <option value="">全部类型</option>
                     <option value="auth">认证</option>
                     <option value="database">数据库</option>
                     <option value="network">网络</option>
                     <option value="system">系统</option>
                 </select>
-                <button id="clear-filters">清除筛选</button>
-                <button id="refresh-logs">刷新</button>
+                <button onclick="clearFilters()">清除筛选</button>
+                <button onclick="refreshLogs()">刷新</button>
+                <button onclick="clearLogs()">清空日志</button>
             </div>
             
+            <!-- 日志容器 - 这是关键部分 -->
             <div class="logs-container">
-                <table class="logs-table">
-                    <thead>
-                        <tr>
-                            <th>时间</th>
-                            <th>级别</th>
-                            <th>消息</th>
-                            <th>类型</th>
-                        </tr>
-                    </thead>
-                    <tbody id="logs-body">
-                        <!-- 日志条目将通过 JavaScript 动态添加 -->
-                    </tbody>
-                </table>
+                <div class="logs-header">
+                    <span>实时日志 (最新在顶部)</span>
+                    <label>
+                        <input type="checkbox" id="auto-scroll" checked> 自动滚动
+                    </label>
+                </div>
+                
+                <!-- 表格形式的日志显示 -->
+                <div id="log-container" class="log-table-container">
+                    <table class="logs-table">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>级别</th>
+                                <th>消息</th>
+                                <th>类型</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-body">
+                            <tr class="log-placeholder">
+                                <td colspan="4">等待日志数据...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
+    
     <footer>
         <p>&copy; 2023 异步日志系统监控面板</p>
+    </footer>
+
+    <script>
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 页面加载完成，初始化系统...');
+            
+            // 初始化WebSocket连接
+            initWebSocket();
+            
+            // 加载初始数据
+            loadInitialData();
+            
+            // 设置定时刷新统计数据
+            setInterval(fetchStats, 30000); // 每30秒刷新一次统计
+        });
+        
+        async function loadInitialData() {
+            try {
+                await fetchLogs();
+                await fetchStats();
+                console.log('✅ 初始数据加载完成');
+            } catch (error) {
+                console.error('❌ 初始数据加载失败:', error);
+            }
+        }
+    </script>
 </body>
 </html>
