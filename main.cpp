@@ -3,6 +3,8 @@
 #include "Util/SessionManager.hpp"
 #include "Util/LogTemplates.hpp"
 #include "Util/SessionManager.hpp"
+#include "Util/ConfigManager.hpp"
+#include "Util/SharedConfigManager.hpp"
 #include <exception>
 #include <random>
 #include <array>
@@ -49,29 +51,32 @@ void TEST_FUNC(BITMAP bitmap){
 int main(){
     // TODO: 提供多种日志选项
     // 用户可以选择普通文件(.txt)或html文件(.html)
-    int option = 0;
-    std::cout << "请选择日志选项: " << std::endl;
-    std::cout << "0. 普通文件(.txt)" << std::endl;
-    std::cout << "1. HTML文件(.html)" << std::endl;
-    std::cin >> option;
+    // int option = 0;
+    // std::cout << "请选择日志选项: " << std::endl;
+    // std::cout << "0. 普通文件(.txt)" << std::endl;
+    // std::cout << "1. HTML文件(.html)" << std::endl;
+    // std::cin >> option;
 
-    std::ofstream file("/tmp/option.tmp");
-    if (file) {
-        file << option;
-        // 记得要 flush 刷新缓冲区
-        // 这样才能确保数据写入文件
-        file.flush();
-        std::rename("/tmp/option.tmp", "/tmp/option.flag"); // 原子操作
-        std::cout << "选项已保存到 /tmp/option.flag" << std::endl;
-        std::cout << "option = " << option << std::endl;
-    }
-    if(option < 0 || option > 1){
-        std::cerr << "无效的选项, 请选择0或1。" << std::endl;
-        return -1;
-    } 
-    switch(option){
-        case 0:
-        {
+    // std::ofstream file("/tmp/option.tmp");
+    // if (file) {
+    //     file << option;
+    //     // 记得要 flush 刷新缓冲区
+    //     // 这样才能确保数据写入文件
+    //     file.flush();
+    //     std::rename("/tmp/option.tmp", "/tmp/option.flag"); // 原子操作
+    //     std::cout << "选项已保存到 /tmp/option.flag" << std::endl;
+    //     std::cout << "option = " << option << std::endl;
+    // }
+    // ConfigSpace::ConfigManager::getInstance()->initFromUserInput();
+    // std::cout << "ConfigManager initialized with format: " 
+    //           << ConfigSpace::ConfigManager::getInstance()->getFormatString() << std::endl;
+    // 初始化日志系统
+    // if(ConfigSpace::ConfigManager::getInstance()->isInitialized()){
+
+    ConfigSpace::SharedConfigManager::getInstance().initFromUserInput();
+
+    if(ConfigSpace::SharedConfigManager::getInstance().isInitialized()){
+        if(ConfigSpace::ConfigManager::getInstance()->isTextFormat()){
             Logger logger("log.txt", false);
             while(true){
                 auto now = std::chrono::system_clock::now();
@@ -180,7 +185,7 @@ int main(){
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
         }
-        case 1:
+        else
         {
             Logger logger("log.html", true);
             while(true){

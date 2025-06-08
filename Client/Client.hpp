@@ -16,6 +16,8 @@
 #include <regex>
 #include <chrono>
 #include "../Logger.hpp"
+#include "../Util/ConfigManager.hpp"
+#include "../Util/SharedConfigManager.hpp"
 #include "../LogMessage/LogMessage.hpp"
 
 
