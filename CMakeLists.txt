@@ -27,6 +27,8 @@ add_executable(server
     LogMessage/AsyncLogBuffer.cpp
     Util/SessionManager.cpp
     Util/LogTemplates.cpp
+    Util/ConfigManager.cpp
+    Util/SharedConfigManager.cpp
     MySQL/SqlConnPool.cpp
 )
 
@@ -43,6 +45,8 @@ add_executable(webserver
     # WebSocket/WebSocketHelpers.cpp
     WebSocket/WebSocketApiHandlers.cpp
     Util/SessionManager.cpp
+    Util/ConfigManager.cpp
+    Util/SharedConfigManager.cpp
     LogMessage/LogMessage.cpp
     LogMessage/AsyncLogBuffer.cpp
 )
@@ -52,17 +56,22 @@ add_executable(client
     Client/Client.cpp
     LogMessage/LogMessage.cpp
     LogMessage/AsyncLogBuffer.cpp
+    Util/ConfigManager.cpp
+    Util/SharedConfigManager.cpp
 )
 
 add_executable(main 
     main.cpp
     Util/SessionManager.cpp
     Util/LogTemplates.cpp
+    Util/ConfigManager.cpp
+    Util/SharedConfigManager.cpp
 )
 
 target_link_libraries(server 
     Server_Lib 
     ${OPENSSL_LIBRARIES}
+    rt
 )
 
 # target_link_libraries(epoll_server 
@@ -74,12 +83,15 @@ target_link_libraries(webserver
     WebSocket_Lib
     EpollServer_Lib
     ${OPENSSL_LIBRARIES}
+    rt
 )
 
 target_link_libraries(client 
     Client_Lib
+    rt
 )
 
 target_link_libraries(main
     pthread
+    rt
 )

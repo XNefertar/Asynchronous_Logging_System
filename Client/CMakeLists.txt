@@ -1,8 +1,14 @@
-add_library(Client_Lib Client.cpp main.cpp)
+add_library(Client_Lib 
+    Client.cpp 
+    main.cpp 
+    ../Util/ConfigManager.cpp 
+    ../Util/SharedConfigManager.cpp
+)
 
 target_include_directories(Client_Lib 
     PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}/Client
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Util
     ${OPENSSL_INCLUDE_DIR}  # 添加OpenSSL头文件路径
 )
 

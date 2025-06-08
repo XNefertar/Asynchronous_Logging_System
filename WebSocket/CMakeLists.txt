@@ -2,6 +2,8 @@ add_library(WebSocket_Lib
     WebSocket.cpp 
     WebSocketApiHandlers.cpp 
     WebSocketServer.cpp
+    ../Util/ConfigManager.cpp
+    ../Util/SharedConfigManager.cpp
 )
 
 target_include_directories(WebSocket_Lib

@@ -2,6 +2,7 @@ add_library(EpollServer_Lib
     EpollServer.cpp 
     main.cpp 
     ../MySQL/SqlConnPool.cpp
+    ../Util/SharedConfigManager.cpp
     ../Server/Server.cpp
 )
 

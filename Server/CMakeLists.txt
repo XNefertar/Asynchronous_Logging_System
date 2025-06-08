@@ -5,6 +5,8 @@ add_library(Server_Lib
     ../MySQL/SqlConnPool.cpp
     ../Util/SessionManager.cpp 
     ../Util/LogTemplates.cpp 
+    ../Util/ConfigManager.cpp
+    ../Util/SharedConfigManager.cpp
     ../LogMessage/LogMessage.cpp
     ../LogMessage/AsyncLogBuffer.cpp
     ../WebSocket/WebSocketServer.cpp
