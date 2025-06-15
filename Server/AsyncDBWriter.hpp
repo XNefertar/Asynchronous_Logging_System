@@ -134,8 +134,7 @@ public:
         
         // 关闭预处理语句
         mysql_stmt_close(stmt);
-        return true;
-            
+        
         return true;
     }
 };

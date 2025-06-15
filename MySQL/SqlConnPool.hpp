@@ -8,6 +8,7 @@
 #include <queue>
 #include <semaphore.h>
 #include <filesystem>
+#include "../Util/EnvConfig.hpp"
 #include "../LogMessage/LogMessage.hpp"
 // #include <condition_variable>
 

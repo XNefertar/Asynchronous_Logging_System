@@ -8,13 +8,13 @@ void AsyncDBWriter::addTask(const DBWriteTask& task) {
         std::unique_lock<std::mutex> lock(mutex_);
         taskQueue_.push(task);
     }
-    cv_.notify_one(); // Í¨Öª¹¤×÷Ïß³ÌÓĞĞÂÈÎÎñ
+    cv_.notify_one(); // é€šçŸ¥å·¥ä½œçº¿ç¨‹æœ‰æ–°ä»»åŠ¡
 }
 
 void AsyncDBWriter::start(int numThreads) {
     for (int i = 0; i < numThreads; ++i) {
         workerThreads_.emplace_back(&AsyncDBWriter::workerThread, this);
-        LogMessage::logMessage(INFO, "Æô¶¯Êı¾İ¿â¹¤×÷Ïß³Ì #%d", i + 1);
+        LogMessage::logMessage(INFO, "å¯åŠ¨æ•°æ®åº“å·¥ä½œçº¿ç¨‹ #%d", i + 1);
     }
 }
 
@@ -23,23 +23,23 @@ void AsyncDBWriter::shutdown() {
         std::unique_lock<std::mutex> lock(mutex_);
         running_ = false;
     }
-    cv_.notify_all(); // Í¨ÖªËùÓĞ¹¤×÷Ïß³Ì
+    cv_.notify_all(); // é€šçŸ¥æ‰€æœ‰å·¥ä½œçº¿ç¨‹
     
-    // µÈ´ıËùÓĞÏß³Ì½áÊø
+    // ç­‰å¾…æ‰€æœ‰çº¿ç¨‹ç»“æŸ
     for (auto& thread : workerThreads_) {
         if (thread.joinable()) {
             thread.join();
         }
     }
     
-    // ´¦ÀíÊ£ÓàÈÎÎñ
+    // å¤„ç†å‰©ä½™ä»»åŠ¡
     std::queue<DBWriteTask> remainingTasks;
     {
         std::unique_lock<std::mutex> lock(mutex_);
         remainingTasks.swap(taskQueue_);
     }
     
-    LogMessage::logMessage(INFO, "´¦ÀíÊ£ÓàµÄ %zu ¸öÊı¾İ¿âÈÎÎñ", remainingTasks.size());
+    LogMessage::logMessage(INFO, "å¤„ç†å‰©ä½™çš„ %zu ä¸ªæ•°æ®åº“ä»»åŠ¡", remainingTasks.size());
     while (!remainingTasks.empty()) {
         executeWrite(remainingTasks.front());
         remainingTasks.pop();
@@ -66,11 +66,11 @@ void AsyncDBWriter::workerThread() {
             });
             
             if (!running_ && taskQueue_.empty()) {
-                return DBWriteTask("", "", 0, ""); // ·µ»Ø¿ÕÈÎÎñ±íÊ¾½áÊø
+                return DBWriteTask("", "", 0, ""); // è¿”å›ç©ºä»»åŠ¡è¡¨ç¤ºç»“æŸ
             }
             
             if (taskQueue_.empty()) {
-                return DBWriteTask("", "", 0, ""); // ³¬Ê±·µ»Ø¿ÕÈÎÎñ
+                return DBWriteTask("", "", 0, ""); // è¶…æ—¶è¿”å›ç©ºä»»åŠ¡
             }
             
             DBWriteTask task = taskQueue_.front();
@@ -89,68 +89,83 @@ bool AsyncDBWriter::executeWrite(const DBWriteTask& task) {
     SqlConnRAII connRAII(&conn, SqlConnPool::getInstance());
     
     if (!conn) {
-        LogMessage::logMessage(ERROR, "ÎŞ·¨»ñÈ¡Êı¾İ¿âÁ¬½Ó");
+        LogMessage::logMessage(ERROR, "æ— æ³•è·å–æ•°æ®åº“è¿æ¥");
         return false;
     }
+
+    // è®¾ç½®è‡ªåŠ¨æäº¤ä¸º false
+    mysql_autocommit(conn, 0);
     
-    // ³õÊ¼»¯Ô¤´¦ÀíÓï¾ä
+    // è®¾ç½®äº‹åŠ¡éš”ç¦»çº§åˆ«
+    mysql_query(conn, "SET TRANSACTION ISOLATION LEVEL READ COMMITTED");
+    mysql_query(conn, "START TRANSACTION");
+
+    // åˆå§‹åŒ–é¢„å¤„ç†è¯­å¥
     MYSQL_STMT *stmt = mysql_stmt_init(conn);
     if (!stmt) {
-        LogMessage::logMessage(ERROR, "mysql_stmt_init() Ê§°Ü: %s", mysql_error(conn));
+        LogMessage::logMessage(ERROR, "mysql_stmt_init() å¤±è´¥: %s", mysql_error(conn));
         return false;
     }
     
-    // ×¼±¸´øÓĞÕ¼Î»·ûµÄSQLÓï¾ä
+    // å‡†å¤‡å¸¦æœ‰å ä½ç¬¦çš„SQLè¯­å¥
     const char *query = "INSERT INTO log_table (level, ip, port, message) VALUES (?, ?, ?, ?)";
     if (mysql_stmt_prepare(stmt, query, strlen(query))) {
-        LogMessage::logMessage(ERROR, "mysql_stmt_prepare() Ê§°Ü: %s", mysql_stmt_error(stmt));
+        LogMessage::logMessage(ERROR, "mysql_stmt_prepare() å¤±è´¥: %s", mysql_stmt_error(stmt));
         mysql_stmt_close(stmt);
         return false;
     }
     
-    // °ó¶¨²ÎÊı
+    // ç»‘å®šå‚æ•°
     MYSQL_BIND bind[4];
     memset(bind, 0, sizeof(bind));
     
-    // level ²ÎÊı
+    // level å‚æ•°
     bind[0].buffer_type = MYSQL_TYPE_STRING;
     bind[0].buffer = (void*)task.logLevel.c_str();
     bind[0].buffer_length = task.logLevel.length();
     
-    // ip ²ÎÊı
+    // ip å‚æ•°
     bind[1].buffer_type = MYSQL_TYPE_STRING;
     bind[1].buffer = (void*)task.clientIP.c_str();
     bind[1].buffer_length = task.clientIP.length();
     
-    // port ²ÎÊı
+    // port å‚æ•°
     unsigned int port = task.clientPort;
     bind[2].buffer_type = MYSQL_TYPE_LONG;
     bind[2].buffer = (void*)&port;
     
-    // message ²ÎÊı
+    // message å‚æ•°
     bind[3].buffer_type = MYSQL_TYPE_STRING;
     bind[3].buffer = (void*)task.message.c_str();
     bind[3].buffer_length = task.message.length();
     
-    // °ó¶¨²ÎÊıµ½Ô¤´¦ÀíÓï¾ä
+    // ç»‘å®šå‚æ•°åˆ°é¢„å¤„ç†è¯­å¥
     if (mysql_stmt_bind_param(stmt, bind)) {
-        LogMessage::logMessage(ERROR, "mysql_stmt_bind_param() Ê§°Ü: %s", mysql_stmt_error(stmt));
+        LogMessage::logMessage(ERROR, "mysql_stmt_bind_param() å¤±è´¥: %s", mysql_stmt_error(stmt));
         mysql_stmt_close(stmt);
         return false;
     }
     
-    // Ö´ĞĞÔ¤´¦ÀíÓï¾ä
+    // æ‰§è¡Œé¢„å¤„ç†è¯­å¥
     if (mysql_stmt_execute(stmt)) {
-        LogMessage::logMessage(ERROR, "mysql_stmt_execute() Ê§°Ü: %s", mysql_stmt_error(stmt));
+        LogMessage::logMessage(ERROR, "mysql_stmt_execute() å¤±è´¥: %s", mysql_stmt_error(stmt));
         mysql_stmt_close(stmt);
         return false;
     }
-    
-    LogMessage::logMessage(INFO, "MySQL ³É¹¦²åÈëÈÕÖ¾: level=%s, ip=%s, port=%u", 
+
+    // æäº¤äº‹åŠ¡
+    if (mysql_commit(conn) != 0) {
+        mysql_rollback(conn);
+        LogMessage::logMessage(ERROR, "äº‹åŠ¡æäº¤å¤±è´¥: %s", mysql_error(conn));
+        mysql_stmt_close(stmt);
+        return false;
+    }
+
+    LogMessage::logMessage(INFO, "MySQL æˆåŠŸæ’å…¥æ—¥å¿—: level=%s, ip=%s, port=%u", 
                            task.logLevel.c_str(), task.clientIP.c_str(), port);
     
-    broadcastLogToWebSocket(task.logLevel, task.message, task.timestamp);
-    // ¹Ø±ÕÔ¤´¦ÀíÓï¾ä
+    // broadcastLogToWebSocket(task.logLevel, task.message, task.timestamp);
+    // å…³é—­é¢„å¤„ç†è¯­å¥
     mysql_stmt_close(stmt);
     return true;
 }

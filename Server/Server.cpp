@@ -248,7 +248,7 @@ Server::ServerTCP::ServerTCP(uint64_t    port
             }
             
             // 启动异步数据库写入器
-            AsyncDBWriter::getInstance().start(2); // 启动2个工作线程
+            AsyncDBWriter::getInstance().start(10); // 启动2个工作线程
         }
 
 // 修改析构函数，确保正确关闭异步写入器

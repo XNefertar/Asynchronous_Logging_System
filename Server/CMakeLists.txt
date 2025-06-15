@@ -7,6 +7,7 @@ add_library(Server_Lib
     ../Util/LogTemplates.cpp 
     ../Util/ConfigManager.cpp
     ../Util/SharedConfigManager.cpp
+    ../Util/EnvConfig.cpp
     ../LogMessage/LogMessage.cpp
     ../LogMessage/AsyncLogBuffer.cpp
     ../WebSocket/WebSocketServer.cpp

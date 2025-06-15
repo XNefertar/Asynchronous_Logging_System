@@ -29,6 +29,7 @@ add_executable(server
     Util/LogTemplates.cpp
     Util/ConfigManager.cpp
     Util/SharedConfigManager.cpp
+    Util/EnvConfig.cpp
     MySQL/SqlConnPool.cpp
 )
 
@@ -47,6 +48,7 @@ add_executable(webserver
     Util/SessionManager.cpp
     Util/ConfigManager.cpp
     Util/SharedConfigManager.cpp
+    Util/EnvConfig.cpp
     LogMessage/LogMessage.cpp
     LogMessage/AsyncLogBuffer.cpp
 )
@@ -83,6 +85,7 @@ target_link_libraries(webserver
     WebSocket_Lib
     EpollServer_Lib
     ${OPENSSL_LIBRARIES}
+    jsoncpp
     rt
 )
 

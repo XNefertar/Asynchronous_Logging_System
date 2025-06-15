@@ -3,17 +3,17 @@
 namespace ConfigSpace {
 
 // 在.cpp文件中定义静态成员
-ConfigManager* ConfigManager::instance_ = nullptr;
-std::mutex ConfigManager::mutex_;
+ConfigManager* ConfigManager::_instance = nullptr;
+std::mutex ConfigManager::_mutex;
 
 ConfigManager* ConfigManager::getInstance() {
-    if (instance_ == nullptr) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (instance_ == nullptr) {
-            instance_ = new ConfigManager();
+    if (_instance == nullptr) {
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (_instance == nullptr) {
+            _instance = new ConfigManager();
         }
     }
-    return instance_;
+    return _instance;
 }
 
 void ConfigManager::initFromUserInput() {
@@ -28,17 +28,17 @@ void ConfigManager::initFromUserInput() {
     }
     
     setLogFormat(static_cast<LogFormat>(option));
-    initialized_.store(true);
+    _initialized.store(true);
     
     std::cout << "配置已设置: " << getFormatString() << std::endl;
 }
 
 void ConfigManager::setLogFormat(LogFormat format) {
-    logFormat_.store(format, std::memory_order_release);
+    _logFormat.store(format, std::memory_order_release);
 }
 
 LogFormat ConfigManager::getLogFormat() const {
-    return logFormat_.load(std::memory_order_acquire);
+    return _logFormat.load(std::memory_order_acquire);
 }
 
 bool ConfigManager::isTextFormat() const {
@@ -62,13 +62,13 @@ std::string ConfigManager::getFormatString() const {
 }
 
 bool ConfigManager::isInitialized() const {
-    return initialized_.load(std::memory_order_acquire);
+    return _initialized.load(std::memory_order_acquire);
 }
 
 void ConfigManager::cleanup() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    delete instance_;
-    instance_ = nullptr;
+    std::lock_guard<std::mutex> lock(_mutex);
+    delete _instance;
+    _instance = nullptr;
 }
 
 } // namespace ConfigSpace

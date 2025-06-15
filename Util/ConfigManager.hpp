@@ -14,11 +14,11 @@ enum class LogFormat {
 class ConfigManager {
 private:
     // 只声明，不定义
-    static ConfigManager* instance_;
-    static std::mutex mutex_;
+    static ConfigManager* _instance;
+    static std::mutex _mutex;
     
-    std::atomic<LogFormat> logFormat_{LogFormat::TEXT};
-    std::atomic<bool> initialized_{false};
+    std::atomic<LogFormat> _logFormat{LogFormat::TEXT};
+    std::atomic<bool> _initialized{false};
     
     ConfigManager() = default;
     ConfigManager(const ConfigManager&) = delete;

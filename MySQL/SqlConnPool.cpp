@@ -27,9 +27,28 @@ void SqlConnPool::createDatabase(std::string dbName)
     }
 }
 
+#include "SqlConnPool.hpp"
+#include "../Util/EnvConfig.hpp"  // 添加环境配置头文件
+
+// ...existing code...
+
 bool SqlConnPool::init(const char *host, const char *user, const char *password, const char *dbName, int port, int connSize) {
+    // 如果传入的参数为空或默认值，尝试从环境变量获取
+    std::string actualHost = (host && strlen(host) > 0) ? host : EnvConfig::getDBHost();
+    std::string actualUser = (user && strlen(user) > 0) ? user : EnvConfig::getDBUser();
+    std::string actualPassword = (password && strlen(password) > 0) ? password : EnvConfig::getDBPassword();
+    std::string actualDBName = (dbName && strlen(dbName) > 0) ? dbName : EnvConfig::getDBName();
+    int actualPort = (port > 0) ? port : EnvConfig::getDBPort();
+    
     std::string path = std::filesystem::current_path().string() + "/Log/SqlConnPool.txt";
     LogMessage::setDefaultLogPath(path);
+
+    std::cout << "[数据库] 使用配置:" << std::endl;
+    std::cout << "  - 主机: " << actualHost << std::endl;
+    std::cout << "  - 端口: " << actualPort << std::endl;
+    std::cout << "  - 用户: " << actualUser << std::endl;
+    std::cout << "  - 数据库: " << actualDBName << std::endl;
+    std::cout << "  - 连接数: " << connSize << std::endl;
 
     // 1. 创建临时连接，不指定数据库
     MYSQL* temp = mysql_init(nullptr);
@@ -39,15 +58,15 @@ bool SqlConnPool::init(const char *host, const char *user, const char *password,
     }
 
     // 连接到服务器，不指定数据库
-    if (!mysql_real_connect(temp, host, user, password, nullptr, port, nullptr, 0)) {
+    if (!mysql_real_connect(temp, actualHost.c_str(), actualUser.c_str(), 
+                            actualPassword.c_str(), nullptr, actualPort, nullptr, 0)) {
         LogMessage::logMessage(ERROR, "Failed to connect to MySQL server: %s", mysql_error(temp));
         mysql_close(temp);
         return false;
     }
 
     // 2. 创建数据库
-    std::string sql = "CREATE DATABASE IF NOT EXISTS ";
-    sql += dbName;
+    std::string sql = "CREATE DATABASE IF NOT EXISTS " + actualDBName;
     if (mysql_query(temp, sql.c_str()) != 0) {
         LogMessage::logMessage(ERROR, "Failed to create database: %s", mysql_error(temp));
         mysql_close(temp);
@@ -55,19 +74,19 @@ bool SqlConnPool::init(const char *host, const char *user, const char *password,
     }
 
     // 选择刚创建的数据库
-    if (mysql_select_db(temp, dbName) != 0) {
+    if (mysql_select_db(temp, actualDBName.c_str()) != 0) {
         LogMessage::logMessage(ERROR, "Failed to select database: %s", mysql_error(temp));
         mysql_close(temp);
         return false;
     }
-    LogMessage::logMessage(INFO, "Database %s selected successfully", dbName);
+    LogMessage::logMessage(INFO, "Database %s selected successfully", actualDBName.c_str());
 
     // 3. 创建表结构
     sql = R"(
         CREATE TABLE IF NOT EXISTS log_table (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, 
         level ENUM('TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'FATAL') NOT NULL, 
-        ip VARCHAR(45) NOT NULL,  -- 支持完整的IPv6地址
+        ip VARCHAR(45) NOT NULL,
         port SMALLINT UNSIGNED NOT NULL, 
         message TEXT, 
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -92,7 +111,9 @@ bool SqlConnPool::init(const char *host, const char *user, const char *password,
             continue;
         }
 
-        conn = mysql_real_connect(conn, host, user, password, dbName, port, nullptr, 0);
+        conn = mysql_real_connect(conn, actualHost.c_str(), actualUser.c_str(), 
+                                  actualPassword.c_str(), actualDBName.c_str(), 
+                                  actualPort, nullptr, 0);
         if (!conn) {
             LogMessage::logMessage(ERROR, "MySQL Connect error: %s", mysql_error(conn));
             continue;
@@ -106,6 +127,7 @@ bool SqlConnPool::init(const char *host, const char *user, const char *password,
 
     return true;
 }
+
 
 MYSQL* SqlConnPool::getConnection(){
     // 条件变量是先上锁后判断的
