@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  websocket-app:
+    image: asynchronous_logging_system_websocket-app:latest
+    container_name: async-logging-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=Xlinux12345
+      - DB_NAME=log
+      - APP_PORT=8080
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./logs:/app/logs
+      - ./static:/app/static
+    networks:
+      - logging-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: async-logging-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: Xlinux12345
+      MYSQL_DATABASE: log
+      MYSQL_USER: root
+      MYSQL_PASSWORD: Xlinux12345
+    ports:
+      - "3307:3306"  # 使用不同的外部端口
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - logging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mysql_data:
+
+networks:
+  logging-network:
+    driver: bridge

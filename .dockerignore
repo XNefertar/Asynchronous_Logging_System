@@ -1,0 +1,20 @@
+# 忽略 CMake 和 make 产生的构建目录
+build/
+
+# 忽略编译产生的临时文件和库文件
+*.o
+*.a
+*.so
+
+# 忽略 IDE 和编辑器配置文件
+.vscode/
+.idea/
+
+# 忽略 git 目录
+.git
+
+# 忽略 dockerignore 文件本身
+.dockerignore
+
+# 忽略 Dockerfile (如果它不在根目录)
+WebSocket/Dockerfile
