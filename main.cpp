@@ -73,10 +73,16 @@ int main(){
     // 初始化日志系统
     // if(ConfigSpace::ConfigManager::getInstance()->isInitialized()){
 
-    ConfigSpace::SharedConfigManager::getInstance().initFromUserInput();
+    // 使用 RAII 包装器，确保资源正确清理
+    ConfigSpace::SharedConfigRAII configRAII;
+    auto& configManager = configRAII.get();
+    
+    // 初始化配置
+    configManager.initFromUserInput();
 
-    if(ConfigSpace::SharedConfigManager::getInstance().isInitialized()){
-        if(ConfigSpace::ConfigManager::getInstance()->isTextFormat()){
+    if(configManager.isInitialized()){
+        configManager.printStatus();
+        if(configManager.isTextFormat()){
             Logger logger("log.txt", false);
             while(true){
                 auto now = std::chrono::system_clock::now();

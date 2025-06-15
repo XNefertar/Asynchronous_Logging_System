@@ -124,11 +124,14 @@ void ClientTCP::run() {
     //     std::cout << "等待配置初始化..." << std::endl;
     // }
 
-    while(ConfigSpace::SharedConfigManager::getInstance().isInitialized() == false){
+    ConfigSpace::SharedConfigRAII configRAII;
+    auto& configManager = configRAII.get();
+
+    while(configManager.isInitialized() == false){
         std::this_thread::sleep_for(std::chrono::seconds(1));
         std::cout << "等待配置初始化..." << std::endl;
     }
-    if(ConfigSpace::SharedConfigManager::getInstance().isTextFormat()) {
+    if(configManager.isTextFormat()) {
         for(;;) {
             // 每次循环重新打开文件
             std::string path = std::filesystem::current_path().string() + "/log.txt";
