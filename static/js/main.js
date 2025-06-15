@@ -221,19 +221,106 @@ function handleAutoScroll(newRow) {
     }
 }
 
+// ==================== 工具函数 ====================
+
+function determineLogType(message) {
+    const msg = message.toLowerCase();
+    
+    if (msg.includes('login') || msg.includes('auth') || msg.includes('password')) {
+        return '认证';
+    } else if (msg.includes('database') || msg.includes('sql') || msg.includes('mysql')) {
+        return '数据库';
+    } else if (msg.includes('network') || msg.includes('connection') || msg.includes('socket')) {
+        return '网络';
+    } else if (msg.includes('system') || msg.includes('server') || msg.includes('process')) {
+        return '系统';
+    } else {
+        return '其他';
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function handleAutoScroll(newRow) {
+    const autoScroll = document.getElementById('auto-scroll');
+    if (autoScroll && autoScroll.checked) {
+        newRow.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'nearest' 
+        });
+    }
+}
+
+// ==================== 统计显示更新 ====================
+
+function updateStatsDisplay(stats) {
+    console.log('更新统计显示:', stats);
+    
+    try {
+        // 更新总日志数
+        if (stats.totalLogs !== undefined) {
+            updateCounterDisplay('total-logs', stats.totalLogs);
+            logCounter.total = stats.totalLogs;
+        }
+        
+        // 更新警告数
+        if (stats.warningCount !== undefined) {
+            updateCounterDisplay('warning-count', stats.warningCount);
+            logCounter.warning = stats.warningCount;
+        }
+        
+        // 更新错误数
+        if (stats.errorCount !== undefined) {
+            updateCounterDisplay('error-count', stats.errorCount);
+            logCounter.error = stats.errorCount;
+        }
+        
+        // 更新信息数
+        if (stats.infoCount !== undefined) {
+            updateCounterDisplay('info-count', stats.infoCount);
+            logCounter.info = stats.infoCount;
+        }
+        
+        // 更新调试数（如果存在）
+        if (stats.debugCount !== undefined) {
+            logCounter.debug = stats.debugCount;
+        }
+        
+        // 更新客户端连接数
+        if (stats.clientCount !== undefined) {
+            updateCounterDisplay('client-count', stats.clientCount);
+        }
+        
+        console.log('统计显示更新完成');
+        
+    } catch (error) {
+        console.error('更新统计显示失败:', error);
+    }
+}
+
 // ==================== API 调用 ====================
 
 async function fetchLogs(limit = 100) {
     try {
-        console.log('获取历史日志...');
-        const response = await fetch(`/api/logs?limit=${limit}`);
+        console.log('通过WebSocket获取历史日志...');
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // 优先使用WebSocket，降级到HTTP
+        let logs;
+        if (isConnected && window.wsAPI) {
+            try {
+                logs = await window.wsAPI.getLogs(limit);
+                console.log(`WebSocket获取到 ${logs.length} 条历史日志`);
+            } catch (wsError) {
+                console.warn('WebSocket获取失败，使用HTTP备用:', wsError);
+                logs = await fetchLogsHTTP(limit);
+            }
+        } else {
+            logs = await fetchLogsHTTP(limit);
         }
-        
-        const logs = await response.json();
-        console.log(`获取到 ${logs.length} 条历史日志`);
         
         // 清空现有日志
         const logsBody = document.getElementById('logs-body');
@@ -254,17 +341,31 @@ async function fetchLogs(limit = 100) {
     }
 }
 
+// HTTP备用方案
+async function fetchLogsHTTP(limit = 100) {
+    const response = await fetch(`/api/logs?limit=${limit}`);
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return await response.json();
+}
+
 async function fetchStats() {
     try {
-        console.log('获取统计信息...');
-        const response = await fetch('/api/stats');
+        console.log('通过WebSocket获取统计信息...');
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        let stats;
+        if (isConnected && window.wsAPI) {
+            try {
+                stats = await window.wsAPI.getStats();
+                console.log('WebSocket统计信息:', stats);
+            } catch (wsError) {
+                console.warn('WebSocket获取统计失败，使用HTTP备用:', wsError);
+                stats = await fetchStatsHTTP();
+            }
+        } else {
+            stats = await fetchStatsHTTP();
         }
-        
-        const stats = await response.json();
-        console.log('统计信息:', stats);
         
         updateStatsDisplay(stats);
         
@@ -273,22 +374,13 @@ async function fetchStats() {
     }
 }
 
-function updateStatsDisplay(stats) {
-    if (stats.totalLogs !== undefined) {
-        updateCounterDisplay('total-logs', stats.totalLogs);
-        logCounter.total = stats.totalLogs;
+// HTTP备用方案
+async function fetchStatsHTTP() {
+    const response = await fetch('/api/stats');
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    if (stats.warningCount !== undefined) {
-        updateCounterDisplay('warning-count', stats.warningCount);
-        logCounter.warning = stats.warningCount;
-    }
-    if (stats.errorCount !== undefined) {
-        updateCounterDisplay('error-count', stats.errorCount);
-        logCounter.error = stats.errorCount;
-    }
-    if (stats.clientCount !== undefined) {
-        updateCounterDisplay('client-count', stats.clientCount);
-    }
+    return await response.json();
 }
 
 // ==================== 用户操作 ====================
@@ -301,29 +393,64 @@ function refreshLogs() {
     });
 }
 
-function clearLogs() {
+async function clearLogs() {
     if (confirm('确定要清空所有显示的日志吗？这不会影响服务器上的日志数据。')) {
-        const logsBody = document.getElementById('logs-body');
-        logsBody.innerHTML = '<tr class="log-placeholder"><td colspan="4">日志已清空</td></tr>';
-        currentLogs = [];
-        
-        // 重置计数器显示（但不影响服务器统计）
-        document.getElementById('total-logs').textContent = '0';
-        document.getElementById('warning-count').textContent = '0';
-        document.getElementById('error-count').textContent = '0';
-        document.getElementById('info-count').textContent = '0';
-        
-        showNotification('本地日志已清空', 'success');
+        try {
+            // 优先使用WebSocket
+            if (isConnected && window.wsAPI) {
+                await window.wsAPI.clearLogs();
+                showNotification('服务器日志已清空', 'success');
+            }
+            
+            // 清空本地显示
+            const logsBody = document.getElementById('logs-body');
+            logsBody.innerHTML = '<tr class="log-placeholder"><td colspan="4">日志已清空</td></tr>';
+            currentLogs = [];
+            
+            // 重置计数器显示
+            document.getElementById('total-logs').textContent = '0';
+            document.getElementById('warning-count').textContent = '0';
+            document.getElementById('error-count').textContent = '0';
+            document.getElementById('info-count').textContent = '0';
+            
+            showNotification('本地日志已清空', 'success');
+        } catch (error) {
+            console.error('清空日志失败:', error);
+            showNotification('清空日志失败: ' + error.message, 'error');
+        }
     }
 }
 
 async function downloadLogFile(format) {
     try {
-        console.log(`下载 ${format} 格式日志...`);
+        console.log(`通过WebSocket下载 ${format} 格式日志...`);
         showNotification(`正在准备 ${format.toUpperCase()} 格式下载...`, 'info');
         
-        const response = await fetch(`/api/download-log?type=${format}`);
+        // 尝试WebSocket下载
+        if (isConnected && window.wsAPI) {
+            try {
+                const downloadData = await window.wsAPI.downloadLogs(format);
+                
+                // 创建下载链接
+                const blob = new Blob([downloadData.content], { type: downloadData.mimeType });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = downloadData.filename || `logs_${new Date().toISOString().split('T')[0]}.${format}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showNotification(`${format.toUpperCase()} 文件下载完成`, 'success');
+                return;
+            } catch (wsError) {
+                console.warn('WebSocket下载失败，使用HTTP备用:', wsError);
+            }
+        }
         
+        // HTTP备用方案
+        const response = await fetch(`/api/download-log?type=${format}`);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -343,6 +470,30 @@ async function downloadLogFile(format) {
     } catch (error) {
         console.error('下载失败:', error);
         showNotification('下载失败: ' + error.message, 'error');
+    }
+}
+
+// 添加实时日志级别过滤
+async function filterLogsByLevel(level) {
+    if (isConnected && window.wsAPI) {
+        try {
+            const logs = await window.wsAPI.getLogsByLevel(level);
+            console.log(`获取到 ${logs.length} 条 ${level} 级别日志`);
+            
+            // 更新显示
+            const logsBody = document.getElementById('logs-body');
+            logsBody.innerHTML = '';
+            currentLogs = [];
+            
+            logs.reverse().forEach(log => {
+                addLogEntryToTable(log);
+            });
+            
+            showNotification(`已过滤显示 ${level} 级别日志`, 'info');
+        } catch (error) {
+            console.error('过滤日志失败:', error);
+            showNotification('过滤日志失败: ' + error.message, 'error');
+        }
     }
 }
 

@@ -26,48 +26,139 @@ std::vector<std::map<std::string, std::string>> fetchLogsFromDatabase(int limit,
         return logs;
     }
     
-
-    // TODO 
-    // MySQL注入问题
-    // 构建SQL查询
-    std::string sql = "SELECT level, message, DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i:%s') as timestamp FROM log_table";
+    // 启动读事务，设置隔离级别
+    mysql_autocommit(conn, 0);  // 关闭自动提交
+    mysql_query(conn, "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED");
+    mysql_query(conn, "START TRANSACTION");
     
-    // 添加过滤条件
-    if (!levelFilter.empty()) {
-        sql += " WHERE level = '" + levelFilter + "'";
+    // 使用预处理语句防止SQL注入并支持事务
+    MYSQL_STMT *stmt = mysql_stmt_init(conn);
+    if (!stmt) {
+        mysql_rollback(conn);
+        std::cerr << "mysql_stmt_init failed: " << mysql_error(conn) << std::endl;
+        return logs;
     }
     
-    // 添加排序和分页
-    sql += " ORDER BY timestamp DESC LIMIT " + std::to_string(offset) + ", " + std::to_string(limit);
+    // 构建安全的SQL查询
+    std::string sql;
+    int paramCount = 2; // offset 和 limit
+    
+    if (!levelFilter.empty()) {
+        sql = "SELECT level, message, DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i:%s') as timestamp "
+              "FROM log_table WHERE level = ? ORDER BY timestamp DESC LIMIT ?, ?";
+        paramCount = 3; // level, offset, limit
+    } else {
+        sql = "SELECT level, message, DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i:%s') as timestamp "
+              "FROM log_table ORDER BY timestamp DESC LIMIT ?, ?";
+    }
+    
+    if (mysql_stmt_prepare(stmt, sql.c_str(), sql.length())) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_prepare failed: " << mysql_stmt_error(stmt) << std::endl;
+        return logs;
+    }
+    
+    // 绑定参数
+    MYSQL_BIND bind[3];
+    memset(bind, 0, sizeof(bind));
+    
+    int paramIndex = 0;
+    
+    // level 参数 (如果有过滤条件)
+    if (!levelFilter.empty()) {
+        bind[paramIndex].buffer_type = MYSQL_TYPE_STRING;
+        bind[paramIndex].buffer = (void*)levelFilter.c_str();
+        bind[paramIndex].buffer_length = levelFilter.length();
+        paramIndex++;
+    }
+    
+    // offset 参数
+    bind[paramIndex].buffer_type = MYSQL_TYPE_LONG;
+    bind[paramIndex].buffer = (void*)&offset;
+    paramIndex++;
+    
+    // limit 参数
+    bind[paramIndex].buffer_type = MYSQL_TYPE_LONG;
+    bind[paramIndex].buffer = (void*)&limit;
+    
+    if (mysql_stmt_bind_param(stmt, bind)) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_bind_param failed: " << mysql_stmt_error(stmt) << std::endl;
+        return logs;
+    }
     
     // 执行查询
-    if (mysql_query(conn, sql.c_str()) != 0) {
-        std::cerr << "Query failed: " << mysql_error(conn) << std::endl;
+    if (mysql_stmt_execute(stmt)) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_execute failed: " << mysql_stmt_error(stmt) << std::endl;
         return logs;
     }
     
-    // 获取结果
-    MYSQL_RES* result = mysql_store_result(conn);
+    // 获取结果元数据
+    MYSQL_RES* result = mysql_stmt_result_metadata(stmt);
     if (!result) {
-        std::cerr << "Failed to store result: " << mysql_error(conn) << std::endl;
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_result_metadata failed: " << mysql_stmt_error(stmt) << std::endl;
         return logs;
     }
     
-    // 获取字段数量
-    int num_fields = mysql_num_fields(result);
+    // 绑定结果
+    MYSQL_BIND resultBind[3];
+    memset(resultBind, 0, sizeof(resultBind));
     
-    // 处理每一行结果
-    MYSQL_ROW row;
-    while ((row = mysql_fetch_row(result))) {
+    char level[64], message[2048], timestamp[32];
+    unsigned long levelLen, messageLen, timestampLen;
+    bool levelIsNull, messageIsNull, timestampIsNull;
+    
+    resultBind[0].buffer_type = MYSQL_TYPE_STRING;
+    resultBind[0].buffer = level;
+    resultBind[0].buffer_length = sizeof(level);
+    resultBind[0].length = &levelLen;
+    resultBind[0].is_null = &levelIsNull;
+    
+    resultBind[1].buffer_type = MYSQL_TYPE_STRING;
+    resultBind[1].buffer = message;
+    resultBind[1].buffer_length = sizeof(message);
+    resultBind[1].length = &messageLen;
+    resultBind[1].is_null = &messageIsNull;
+    
+    resultBind[2].buffer_type = MYSQL_TYPE_STRING;
+    resultBind[2].buffer = timestamp;
+    resultBind[2].buffer_length = sizeof(timestamp);
+    resultBind[2].length = &timestampLen;
+    resultBind[2].is_null = &timestampIsNull;
+    
+    if (mysql_stmt_bind_result(stmt, resultBind)) {
+        mysql_rollback(conn);
+        mysql_free_result(result);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_bind_result failed: " << mysql_stmt_error(stmt) << std::endl;
+        return logs;
+    }
+    
+    // 获取数据并处理结果
+    while (mysql_stmt_fetch(stmt) == 0) {
         std::map<std::string, std::string> log_entry;
-        log_entry["level"] = row[0] ? row[0] : "";
-        log_entry["message"] = row[1] ? row[1] : "";
-        log_entry["timestamp"] = row[2] ? row[2] : "";
+        
+        log_entry["level"] = levelIsNull ? "" : std::string(level, levelLen);
+        log_entry["message"] = messageIsNull ? "" : std::string(message, messageLen);
+        log_entry["timestamp"] = timestampIsNull ? "" : std::string(timestamp, timestampLen);
+        
         logs.push_back(log_entry);
     }
+
+    // 提交读事务
+    if (mysql_commit(conn) != 0) {
+        mysql_rollback(conn);
+        std::cerr << "Read transaction commit failed: " << mysql_error(conn) << std::endl;
+    }
     
-    // 释放结果集
     mysql_free_result(result);
+    mysql_stmt_close(stmt);
     
     return logs;
 }
@@ -84,29 +175,55 @@ int getTotalLogsCount() {
         return 0;
     }
     
-    // TODO
-    // MySQL注入问题
-    // 执行COUNT查询
-    if (mysql_query(conn, "SELECT COUNT(*) FROM log_table") != 0) {
-        std::cerr << "Query failed: " << mysql_error(conn) << std::endl;
+    // 启动读事务
+    mysql_autocommit(conn, 0);
+    mysql_query(conn, "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED");
+    mysql_query(conn, "START TRANSACTION");
+    
+    // 使用预处理语句
+    MYSQL_STMT *stmt = mysql_stmt_init(conn);
+    if (!stmt) {
+        mysql_rollback(conn);
+        std::cerr << "mysql_stmt_init failed: " << mysql_error(conn) << std::endl;
         return 0;
     }
     
-    // 获取结果
-    MYSQL_RES* result = mysql_store_result(conn);
-    if (!result) {
-        std::cerr << "Failed to store result: " << mysql_error(conn) << std::endl;
+    const char* sql = "SELECT COUNT(*) FROM log_table";
+    if (mysql_stmt_prepare(stmt, sql, strlen(sql))) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_prepare failed: " << mysql_stmt_error(stmt) << std::endl;
         return 0;
     }
     
-    // 获取计数值
-    MYSQL_ROW row = mysql_fetch_row(result);
-    if (row && row[0]) {
-        count = std::stoi(row[0]);
+    if (mysql_stmt_execute(stmt)) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_execute failed: " << mysql_stmt_error(stmt) << std::endl;
+        return 0;
     }
     
-    // 释放结果集
-    mysql_free_result(result);
+    // 绑定结果
+    MYSQL_BIND resultBind[1];
+    memset(resultBind, 0, sizeof(resultBind));
+    
+    resultBind[0].buffer_type = MYSQL_TYPE_LONG;
+    resultBind[0].buffer = &count;
+    
+    if (mysql_stmt_bind_result(stmt, resultBind)) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_bind_result failed: " << mysql_stmt_error(stmt) << std::endl;
+        return 0;
+    }
+    
+    if (mysql_stmt_fetch(stmt) == 0) {
+        // count 已经被填充
+    }
+    
+    // 提交读事务
+    mysql_commit(conn);
+    mysql_stmt_close(stmt);
     
     return count;
 }
@@ -123,30 +240,70 @@ int getLogCountByLevel(const std::string& level) {
         return 0;
     }
     
-    // 构建SQL查询
-    std::string sql = "SELECT COUNT(*) FROM log_table WHERE level = '" + level + "'";
+    // 启动读事务
+    mysql_autocommit(conn, 0);
+    mysql_query(conn, "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED");
+    mysql_query(conn, "START TRANSACTION");
     
-    // 执行查询
-    if (mysql_query(conn, sql.c_str()) != 0) {
-        std::cerr << "Query failed: " << mysql_error(conn) << std::endl;
+    //  使用预处理语句防止SQL注入
+    MYSQL_STMT *stmt = mysql_stmt_init(conn);
+    if (!stmt) {
+        mysql_rollback(conn);
+        std::cerr << "mysql_stmt_init failed: " << mysql_error(conn) << std::endl;
         return 0;
     }
     
-    // 获取结果
-    MYSQL_RES* result = mysql_store_result(conn);
-    if (!result) {
-        std::cerr << "Failed to store result: " << mysql_error(conn) << std::endl;
+    const char* sql = "SELECT COUNT(*) FROM log_table WHERE level = ?";
+    if (mysql_stmt_prepare(stmt, sql, strlen(sql))) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_prepare failed: " << mysql_stmt_error(stmt) << std::endl;
         return 0;
     }
     
-    // 获取计数值
-    MYSQL_ROW row = mysql_fetch_row(result);
-    if (row && row[0]) {
-        count = std::stoi(row[0]);
+    // 绑定参数
+    MYSQL_BIND bind[1];
+    memset(bind, 0, sizeof(bind));
+    
+    bind[0].buffer_type = MYSQL_TYPE_STRING;
+    bind[0].buffer = (void*)level.c_str();
+    bind[0].buffer_length = level.length();
+    
+    if (mysql_stmt_bind_param(stmt, bind)) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_bind_param failed: " << mysql_stmt_error(stmt) << std::endl;
+        return 0;
     }
     
-    // 释放结果集
-    mysql_free_result(result);
+    if (mysql_stmt_execute(stmt)) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_execute failed: " << mysql_stmt_error(stmt) << std::endl;
+        return 0;
+    }
+    
+    // 绑定结果
+    MYSQL_BIND resultBind[1];
+    memset(resultBind, 0, sizeof(resultBind));
+    
+    resultBind[0].buffer_type = MYSQL_TYPE_LONG;
+    resultBind[0].buffer = &count;
+    
+    if (mysql_stmt_bind_result(stmt, resultBind)) {
+        mysql_rollback(conn);
+        mysql_stmt_close(stmt);
+        std::cerr << "mysql_stmt_bind_result failed: " << mysql_stmt_error(stmt) << std::endl;
+        return 0;
+    }
+    
+    if (mysql_stmt_fetch(stmt) == 0) {
+        // count 已经被填充
+    }
+    
+    // 提交读事务
+    mysql_commit(conn);
+    mysql_stmt_close(stmt);
     
     return count;
 }

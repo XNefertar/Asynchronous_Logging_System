@@ -1,6 +1,7 @@
 #ifndef __WEBSOCKET_API_HANDLERS_HPP__
 #define __WEBSOCKET_API_HANDLERS_HPP__
 
+#include <jsoncpp/json/json.h>
 #include "../EpollServer/EpollServer.hpp"
 
 using namespace EpollServerSpace;
@@ -10,6 +11,8 @@ HttpResponse handleLogsApi(const HttpRequest& request, ClientSession& session);
 HttpResponse handleStatsApi(const HttpRequest& request, ClientSession& session);
 
 // WebSocket 消息处理函数
+void handleWebSocketRequest(int sockfd, const Json::Value& request, ClientSession& session);
+void sendWebSocketError(int sockfd, const std::string& error);
 void handleWebSocketMessage(int sockfd, const std::string& message, ClientSession& session);
 
 // 广播日志更新

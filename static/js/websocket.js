@@ -106,3 +106,88 @@ function sendWebSocketMessage(message) {
         return false;
     }
 }
+
+// 增加请求-响应模式的 WebSocket API
+const pendingRequests = new Map();
+let requestIdCounter = 0;
+
+function sendWebSocketRequest(type, data = {}, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+            reject(new Error('WebSocket未连接'));
+            return;
+        }
+
+        const requestId = ++requestIdCounter;
+        const message = {
+            type: 'request',
+            requestType: type,
+            requestId: requestId,
+            data: data,
+            timestamp: new Date().toISOString()
+        };
+
+        // 设置超时
+        const timeoutId = setTimeout(() => {
+            if (pendingRequests.has(requestId)) {
+                pendingRequests.delete(requestId);
+                reject(new Error(`WebSocket请求超时: ${type}`));
+            }
+        }, timeout);
+
+        // 存储请求
+        pendingRequests.set(requestId, { resolve, reject, timeoutId });
+
+        // 发送请求
+        websocket.send(JSON.stringify(message));
+        console.log(`WebSocket请求已发送: ${type}`, message);
+    });
+}
+
+function handleWebSocketMessage(data) {
+    try {
+        const message = JSON.parse(data);
+        console.log('解析后的消息:', message);
+        
+        // 处理响应消息
+        if (message.type === 'response' && message.requestId) {
+            const pending = pendingRequests.get(message.requestId);
+            if (pending) {
+                clearTimeout(pending.timeoutId);
+                pendingRequests.delete(message.requestId);
+                
+                if (message.success) {
+                    pending.resolve(message.data);
+                } else {
+                    pending.reject(new Error(message.error || '请求失败'));
+                }
+                return;
+            }
+        }
+        
+        // 处理推送消息
+        if (message.type === 'log_update') {
+            addLogEntryToTable(message);
+            updateStatCounter(message.level);
+            console.log('日志更新处理完成');
+        } else if (message.type === 'stats_update') {
+            updateStatsDisplay(message);
+            console.log('统计更新处理完成');
+        } else {
+            console.log('ℹ未知消息类型:', message.type);
+        }
+        
+    } catch (error) {
+        console.error('消息解析失败:', error);
+        console.error('原始数据:', data);
+    }
+}
+
+// 导出WebSocket API函数
+window.wsAPI = {
+    getLogs: (limit = 100, offset = 0) => sendWebSocketRequest('get_logs', { limit, offset }),
+    getStats: () => sendWebSocketRequest('get_stats'),
+    clearLogs: () => sendWebSocketRequest('clear_logs'),
+    getLogsByLevel: (level) => sendWebSocketRequest('get_logs_by_level', { level }),
+    downloadLogs: (format) => sendWebSocketRequest('download_logs', { format })
+};

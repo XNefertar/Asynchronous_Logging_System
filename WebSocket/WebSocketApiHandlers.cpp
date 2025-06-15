@@ -4,7 +4,8 @@
 #include "../Util/SessionManager.hpp"
 #include <chrono>
 #include <mysql/mysql.h>
-
+#include <iostream>
+#include <filesystem>
 
 #include <iostream>
 #include <filesystem>
@@ -86,17 +87,134 @@ HttpResponse handleStatsApi(const HttpRequest& request, ClientSession& session) 
     return response;
 }
 
+void sendWebSocketError(int sockfd, const std::string& error) {
+    Json::Value errorResponse;
+    errorResponse["type"] = "error";
+    errorResponse["message"] = error;
+    
+    Json::StreamWriterBuilder builder;
+    std::string responseStr = Json::writeString(builder, errorResponse);
+    g_server->sendWebSocketMessage(sockfd, responseStr);
+}
+
 // WebSocket消息处理器
 void handleWebSocketMessage(int sockfd, const std::string& message, ClientSession& session) {
-    // 调用数据库插入函数
-    insertWebSocketMessage(sockfd, message, session);
+    try {
+        // 解析JSON消息
+        Json::Value root;
+        Json::Reader reader;
+        if (!reader.parse(message, root)) {
+            sendWebSocketError(sockfd, "无效的JSON消息");
+            return;
+        }
+        
+        std::string messageType = root.get("type", "").asString();
+        
+        if (messageType == "request") {
+            handleWebSocketRequest(sockfd, root, session);
+        } else {
+            // 处理其他类型的消息
+            insertWebSocketMessage(sockfd, message, session);
+        }
+        
+    } catch (const std::exception& e) {
+        sendWebSocketError(sockfd, std::string("处理消息失败: ") + e.what());
+    }
+}
 
-    // 处理从客户端接收的 WebSocket 消息
-    std::string response = "{\"status\": \"ok\", \"message\": \"Received: " + message + "\"}";
-    std::cout << "handleWebSocketMessage: " << message << std::endl;
-    __log_file << "[INFO] 处理WebSocket消息: " << message << std::endl;
-    auto frame = createWebSocketFrameWrapper(response);
-    send(sockfd, frame.data(), frame.size(), 0);
+void handleWebSocketRequest(int sockfd, const Json::Value& request, ClientSession& session) {
+    std::string requestType = request.get("requestType", "").asString();
+    int requestId = request.get("requestId", 0).asInt();
+    Json::Value data = request.get("data", Json::Value());
+    
+    Json::Value response;
+    response["type"] = "response";
+    response["requestId"] = requestId;
+    response["success"] = true;
+    
+    try {
+        if (requestType == "get_logs") {
+            int limit = data.get("limit", 100).asInt();
+            int offset = data.get("offset", 0).asInt();
+            
+            auto logs = fetchLogsFromDatabase(limit, offset);
+            Json::Value logsArray(Json::arrayValue);
+            
+            for (const auto& log : logs) {
+                Json::Value logObj;
+                logObj["level"] = log.at("level");
+                logObj["message"] = log.at("message");
+                logObj["timestamp"] = log.at("timestamp");
+                logsArray.append(logObj);
+            }
+            
+            response["data"] = logsArray;
+            
+        } else if (requestType == "get_stats") {
+            Json::Value stats;
+            stats["totalLogs"] = getTotalLogsCount();
+            stats["errorCount"] = getLogCountByLevel("ERROR");
+            stats["warningCount"] = getLogCountByLevel("WARNING");
+            stats["infoCount"] = getLogCountByLevel("INFO");
+            stats["clientCount"] = SessionManager::getInstance()->getSessionCount();
+            
+            response["data"] = stats;
+            
+        } else if (requestType == "get_logs_by_level") {
+            std::string level = data.get("level", "").asString();
+            auto logs = fetchLogsFromDatabase(1000, 0, level);
+            
+            Json::Value logsArray(Json::arrayValue);
+            for (const auto& log : logs) {
+                Json::Value logObj;
+                logObj["level"] = log.at("level");
+                logObj["message"] = log.at("message");
+                logObj["timestamp"] = log.at("timestamp");
+                logsArray.append(logObj);
+            }
+            
+            response["data"] = logsArray;
+            
+        } else if (requestType == "download_logs") {
+            std::string format = data.get("format", "txt").asString();
+            
+            // 生成日志文件内容
+            auto logs = fetchLogsFromDatabase(1000, 0);
+            std::string content;
+            
+            if (format == "html") {
+                content = "<html><body><h1>Logs</h1><table>";
+                for (const auto& log : logs) {
+                    content += "<tr><td>" + log.at("timestamp") + "</td><td>" + log.at("level") + "</td><td>" + log.at("message") + "</td></tr>";
+                }
+                content += "</table></body></html>";
+            } else {
+                for (const auto& log : logs) {
+                    content += log.at("timestamp") + " [" + log.at("level") + "] " + log.at("message") + "\n";
+                }
+            }
+            
+            Json::Value downloadData;
+            downloadData["content"] = content;
+            downloadData["filename"] = "logs_" + std::to_string(std::time(nullptr)) + "." + format;
+            downloadData["mimeType"] = (format == "html") ? "text/html" : "text/plain";
+            
+            response["data"] = downloadData;
+            
+        } else {
+            response["success"] = false;
+            response["error"] = "未知的请求类型: " + requestType;
+        }
+        
+    } catch (const std::exception& e) {
+        response["success"] = false;
+        response["error"] = std::string("处理请求失败: ") + e.what();
+    }
+    
+    // 发送响应
+    Json::StreamWriterBuilder builder;
+    std::string responseStr = Json::writeString(builder, response);
+    g_server->sendWebSocketMessage(sockfd, responseStr);
 }
 
 // 发送日志更新到所有 WebSocket 客户端
